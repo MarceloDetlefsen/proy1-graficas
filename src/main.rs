@@ -1,97 +1,45 @@
-mod framebuffer;
-mod line;
+// Prototipo de raycaster pseudo-3D estilo Wolfenstein 3D / DOOM SNES.
+// Sin HUD, sin sprites, sin texturas, sin enemigos: solo el sistema de
+// renderizado (mapa -> jugador -> rayos -> columnas verticales).
 
-use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+mod framebuffer;
+mod input;
+mod map;
+mod player;
+mod raycaster;
+mod renderer;
 
 use framebuffer::Framebuffer;
-use line::line;
+use input::handle_input;
+use map::{PLAYER_START_ANGLE, PLAYER_START_X, PLAYER_START_Y};
+use player::Player;
 use raylib::prelude::*;
 
-fn render(framebuffer: &mut Framebuffer, translate_x: f32, translate_y: f32) {
-    framebuffer.set_current_color(Color::GREEN);
-    line(
-        framebuffer,
-        Vector2::new(50.0 + translate_x, 50.0 + translate_y),
-        Vector2::new(350.0 + translate_x, 350.0 + translate_y),
-    );
-
-    framebuffer.set_current_color(Color::RED);
-    line(
-        framebuffer,
-        Vector2::new(350.0 + translate_x, 50.0 + translate_y),
-        Vector2::new(50.0 + translate_x, 350.0 + translate_y),
-    );
-}
-
-fn screenshot_name() -> String {
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_millis();
-
-    format!("framebuffer_{timestamp}.png")
-}
-
 fn main() {
-    let window_width = 800;
-    let window_height = 600;
-
-    let framebuffer_width = 800;
-    let framebuffer_height = 600;
+    let screen_width: u32 = 800;
+    let screen_height: u32 = 600;
 
     let (mut window, raylib_thread) = raylib::init()
-        .size(window_width, window_height)
-        .title("Window Example")
+        .size(screen_width as i32, screen_height as i32)
+        .title("Raycaster prototype")
         .log_level(TraceLogLevel::LOG_WARNING)
         .build();
 
-    let mut framebuffer = Framebuffer::new(
-        framebuffer_width,
-        framebuffer_height,
-        Color::new(50, 50, 100, 255),
-    );
+    window.set_target_fps(60);
 
-    let mut translate_x: f32 = 0.0;
-    let mut translate_y: f32 = 0.0;
-    let mut velocity_x: f32 = 1.0;
-    let mut velocity_y: f32 = 1.0;
+    let mut framebuffer = Framebuffer::new(screen_width, screen_height, Color::BLACK);
 
-    let min_x = 0.0;
-    let min_y = 0.0;
-    let max_x = framebuffer_width as f32 - 350.0;
-    let max_y = framebuffer_height as f32 - 350.0;
+    let mut player = Player::new(PLAYER_START_X, PLAYER_START_Y, PLAYER_START_ANGLE);
 
     while !window.window_should_close() {
-        translate_x += velocity_x;
-        translate_y += velocity_y;
+        let delta_time = window.get_frame_time();
 
-        if translate_x <= min_x {
-            translate_x = min_x;
-            velocity_x = velocity_x.abs();
-        } else if translate_x >= max_x {
-            translate_x = max_x;
-            velocity_x = -velocity_x.abs();
-        }
+        // Fase 2/5: input y movimiento del jugador dentro del laberinto.
+        handle_input(&window, &mut player, delta_time);
 
-        if translate_y <= min_y {
-            translate_y = min_y;
-            velocity_y = velocity_y.abs();
-        } else if translate_y >= max_y {
-            translate_y = max_y;
-            velocity_y = -velocity_y.abs();
-        }
-
-        framebuffer.clear();
-        render(&mut framebuffer, translate_x, translate_y);
-
-        if window.is_key_pressed(KeyboardKey::KEY_S) {
-            let filename = screenshot_name();
-            framebuffer.render_to_file(&filename);
-        }
+        // Fase 3/4: un rayo por columna, dibujado como techo/piso/paredes.
+        renderer::render(&mut framebuffer, &player, screen_width, screen_height);
 
         framebuffer.swap_buffers(&mut window, &raylib_thread);
-
-        thread::sleep(Duration::from_millis(16));
     }
 }
