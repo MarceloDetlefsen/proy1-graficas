@@ -30,15 +30,26 @@ fn main() {
     let mut framebuffer = Framebuffer::new(screen_width, screen_height, Color::BLACK);
 
     let mut player = Player::new(PLAYER_START_X, PLAYER_START_Y, PLAYER_START_ANGLE);
+    let mut show_minimap = false;
 
     while !window.window_should_close() {
         let delta_time = window.get_frame_time();
+
+        if window.is_key_pressed(KeyboardKey::KEY_M) {
+            show_minimap = !show_minimap;
+        }
 
         // Fase 2/5: input y movimiento del jugador dentro del laberinto.
         handle_input(&window, &mut player, delta_time);
 
         // Fase 3/4: un rayo por columna, dibujado como techo/piso/paredes.
-        renderer::render(&mut framebuffer, &player, screen_width, screen_height);
+        renderer::render(
+            &mut framebuffer,
+            &player,
+            screen_width,
+            screen_height,
+            show_minimap,
+        );
 
         framebuffer.swap_buffers(&mut window, &raylib_thread);
     }

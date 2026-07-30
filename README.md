@@ -25,13 +25,13 @@ optimiza nada, así que puede sentirse con lag.
 
 ## Estructura
 
-- `map.rs` — Fase 1: grid 16x16, `is_wall(x, y)`, punto de inicio del jugador.
-- `player.rs` — Fase 2: posicion, angulo, velocidad, y `try_move` con colision (por eje, con deslizamiento a lo largo de paredes).
-- `raycaster.rs` — Fase 3: `cast_ray` con DDA (digital differential analysis), devuelve distancia perpendicular ya corregida contra fish-eye.
-- `renderer.rs` — Fase 4: techo y piso como rectangulos solidos, paredes como columnas verticales escaladas por `screen_height / distance`.
+- `map.rs` — grid 16x16, `is_wall(x, y)`, punto de inicio del jugador.
+- `player.rs` — posicion, angulo, velocidad, y `try_move` con colision (por eje, con deslizamiento a lo largo de paredes).
+- `raycaster.rs` — `cast_ray` con DDA (digital differential analysis), devuelve distancia perpendicular ya corregida contra fish-eye.
+- `renderer.rs` — techo y piso como rectangulos solidos, paredes como columnas verticales escaladas por `screen_height / distance`.
 - `input.rs` — mapea W/S/A/D a movimiento/rotacion del jugador.
 - `framebuffer.rs` — el mismo framebuffer de los labs de graficos (Image + `set_pixel`), con un `draw_rect` agregado para llenar regiones grandes rapido.
-- `main.rs` — Fase 5: loop principal (input -> render -> swap_buffers) a 60 fps.
+- `main.rs` — loop principal (input -> render -> swap_buffers) a 60 fps.
 
 ## Notas de diseno
 

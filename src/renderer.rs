@@ -7,6 +7,7 @@
 use raylib::prelude::*;
 
 use crate::framebuffer::Framebuffer;
+use crate::map::{MAP, MAP_HEIGHT, MAP_WIDTH};
 use crate::player::Player;
 use crate::raycaster::cast_ray;
 
@@ -16,8 +17,20 @@ const CEILING_COLOR: Color = Color::new(40, 40, 70, 255);
 const FLOOR_COLOR: Color = Color::new(55, 55, 55, 255);
 const WALL_COLOR_VERTICAL: Color = Color::new(255, 140, 0, 255); // pared golpeada en eje X (naranja)
 const WALL_COLOR_HORIZONTAL: Color = Color::new(0, 120, 255, 255); // pared golpeada en eje Y (azul)
+const MINIMAP_BG_COLOR: Color = Color::new(18, 18, 22, 255);
+const MINIMAP_WALL_COLOR: Color = Color::new(210, 210, 210, 255);
+const MINIMAP_PLAYER_COLOR: Color = Color::new(255, 70, 70, 255);
+const MINIMAP_CELL_SIZE: i32 = 8;
+const MINIMAP_PADDING: i32 = 8;
+const MINIMAP_BORDER: i32 = 2;
 
-pub fn render(framebuffer: &mut Framebuffer, player: &Player, screen_width: u32, screen_height: u32) {
+pub fn render(
+    framebuffer: &mut Framebuffer,
+    player: &Player,
+    screen_width: u32,
+    screen_height: u32,
+    show_minimap: bool,
+) {
     let half_height = (screen_height / 2) as i32;
 
     // Techo y piso: dos rectangulos solidos.
@@ -56,4 +69,43 @@ pub fn render(framebuffer: &mut Framebuffer, player: &Player, screen_width: u32,
 
         framebuffer.draw_rect(x as i32, draw_start, 1, draw_end - draw_start, color);
     }
+
+    if show_minimap {
+        draw_minimap(framebuffer, player);
+    }
+}
+
+fn draw_minimap(framebuffer: &mut Framebuffer, player: &Player) {
+    let map_width_px = MAP_WIDTH as i32 * MINIMAP_CELL_SIZE;
+    let map_height_px = MAP_HEIGHT as i32 * MINIMAP_CELL_SIZE;
+    let origin_x = MINIMAP_PADDING;
+    let origin_y = MINIMAP_PADDING;
+
+    framebuffer.draw_rect(
+        origin_x - MINIMAP_BORDER,
+        origin_y - MINIMAP_BORDER,
+        map_width_px + MINIMAP_BORDER * 2,
+        map_height_px + MINIMAP_BORDER * 2,
+        Color::BLACK,
+    );
+    framebuffer.draw_rect(origin_x, origin_y, map_width_px, map_height_px, MINIMAP_BG_COLOR);
+
+    for (y, row) in MAP.iter().enumerate() {
+        for (x, cell) in row.iter().enumerate() {
+            if *cell == 1 {
+                framebuffer.draw_rect(
+                    origin_x + x as i32 * MINIMAP_CELL_SIZE,
+                    origin_y + y as i32 * MINIMAP_CELL_SIZE,
+                    MINIMAP_CELL_SIZE,
+                    MINIMAP_CELL_SIZE,
+                    MINIMAP_WALL_COLOR,
+                );
+            }
+        }
+    }
+
+    let player_x = origin_x + (player.x * MINIMAP_CELL_SIZE as f32) as i32;
+    let player_y = origin_y + (player.y * MINIMAP_CELL_SIZE as f32) as i32;
+
+    framebuffer.draw_rect(player_x - 2, player_y - 2, 4, 4, MINIMAP_PLAYER_COLOR);
 }
