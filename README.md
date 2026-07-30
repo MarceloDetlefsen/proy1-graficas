@@ -3,6 +3,10 @@
 Prototipo de raycasting pseudo-3D (estilo Wolfenstein 3D / DOOM de SNES),
 sin HUD, sprites, texturas ni enemigos. Solo el sistema de renderizado.
 
+## Demostarción del funcionamiento
+
+![Doom ejecutandose](images/doom.gif)
+
 ## Requisitos
 
 - Rust + Cargo
