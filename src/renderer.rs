@@ -103,10 +103,11 @@ fn draw_wall_column(
 
     let mut tex_x = ((wall_coord.rem_euclid(1.0) * tex_w as f32).floor() as i32).clamp(0, tex_w - 1);
 
-    if hit.vertical_wall && ray_dir_x > 0.0 {
+    // Ajuste de orientacion para que el lado visible de la pared no quede espejado.
+    if hit.vertical_wall && ray_dir_x < 0.0 {
         tex_x = tex_w - tex_x - 1;
     }
-    if !hit.vertical_wall && ray_dir_y < 0.0 {
+    if !hit.vertical_wall && ray_dir_y > 0.0 {
         tex_x = tex_w - tex_x - 1;
     }
 
