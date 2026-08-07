@@ -37,10 +37,23 @@ impl Framebuffer {
         self.color_buffer.draw_rectangle(x, y, width, height, color);
     }
 
-    pub fn swap_buffers(&self, window: &mut RaylibHandle, raylib_thread: &RaylibThread) {
-        if let Ok(texture) = window.load_texture_from_image(raylib_thread, &self.color_buffer) {
-            let mut renderer = window.begin_drawing(raylib_thread);
-            renderer.draw_texture(&texture, 0, 0, Color::WHITE);
-        }
+    pub fn clear(&mut self, color: Color) {
+        self.color_buffer
+            .draw_rectangle(0, 0, self.color_buffer.width(), self.color_buffer.height(), color);
+    }
+
+    pub fn swap_buffers<F>(&self, window: &mut RaylibHandle, raylib_thread: &RaylibThread, overlay: F)
+    where
+        F: FnOnce(&mut RaylibDrawHandle<'_>),
+    {
+        let texture = window.load_texture_from_image(raylib_thread, &self.color_buffer).ok();
+
+        window.draw(raylib_thread, |mut renderer| {
+            if let Some(texture) = texture.as_ref() {
+                renderer.draw_texture(texture, 0, 0, Color::WHITE);
+            }
+
+            overlay(&mut renderer);
+        });
     }
 }

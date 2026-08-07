@@ -1,7 +1,7 @@
 /// Guarda posicion (x, y) en punto flotante, angulo de vision, y velocidades de movimiento/rotacion. try_move() aplica colision
 /// contra muros revisando cada eje por separado, lo que de paso permite "deslizarse" a lo largo de una pared en vez de quedar pegado.
 
-use crate::map::is_wall;
+use crate::map::MapGrid;
 
 pub struct Player {
     pub x: f32,
@@ -27,13 +27,13 @@ impl Player {
     }
 
     /// Intenta mover al jugador por (dx, dy). Cada eje se comprueba por separado contra el mapa, con un pequeno margen para que la camara no quede pegada justo en el borde de la pared.
-    pub fn try_move(&mut self, dx: f32, dy: f32) {
+    pub fn try_move(&mut self, dx: f32, dy: f32, map: &MapGrid) {
         const WALL_MARGIN: f32 = 0.2;
 
         if dx != 0.0 {
             let target_x = self.x + dx;
             let probe_x = target_x + WALL_MARGIN * dx.signum();
-            if !is_wall(probe_x, self.y) {
+            if !map.is_wall(probe_x, self.y) {
                 self.x = target_x;
             }
         }
@@ -41,7 +41,7 @@ impl Player {
         if dy != 0.0 {
             let target_y = self.y + dy;
             let probe_y = target_y + WALL_MARGIN * dy.signum();
-            if !is_wall(self.x, probe_y) {
+            if !map.is_wall(self.x, probe_y) {
                 self.y = target_y;
             }
         }

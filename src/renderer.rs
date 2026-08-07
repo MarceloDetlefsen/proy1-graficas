@@ -3,7 +3,7 @@
 use raylib::prelude::*;
 
 use crate::framebuffer::Framebuffer;
-use crate::map::{MAP, MAP_HEIGHT, MAP_WIDTH};
+use crate::map::MapGrid;
 use crate::player::Player;
 use crate::raycaster::{cast_ray, RayHit};
 use crate::textures::TextureManager;
@@ -22,6 +22,7 @@ const MINIMAP_BORDER: i32 = 2;
 pub fn render(
     framebuffer: &mut Framebuffer,
     player: &Player,
+    map: &MapGrid,
     texture_manager: &TextureManager,
     screen_width: u32,
     screen_height: u32,
@@ -41,10 +42,11 @@ pub fn render(
     for x in 0..screen_width {
         let camera_x = 2.0 * x as f32 / screen_width as f32 - 1.0;
         let ray_angle = player.angle + camera_x * (FOV / 2.0);
-        let hit = cast_ray(player, ray_angle);
+        let hit = cast_ray(map, player, ray_angle);
 
         draw_wall_column(
             framebuffer,
+            map,
             player,
             ray_angle,
             &hit,
@@ -55,12 +57,13 @@ pub fn render(
     }
 
     if show_minimap {
-        draw_minimap(framebuffer, player);
+        draw_minimap(framebuffer, map, player);
     }
 }
 
 fn draw_wall_column(
     framebuffer: &mut Framebuffer,
+    map: &MapGrid,
     player: &Player,
     ray_angle: f32,
     hit: &RayHit,
@@ -83,11 +86,8 @@ fn draw_wall_column(
         return;
     }
 
-    let texture_index = if hit.vertical_wall {
-        hit.map_y.rem_euclid(texture_count as i32) as usize
-    } else {
-        hit.map_x.rem_euclid(texture_count as i32) as usize
-    };
+    let texture_index = map.wall_texture_index(hit.map_x, hit.map_y) - 1;
+    let texture_index = texture_index % texture_count;
 
     let Some((tex_w, tex_h)) = texture_manager.wall_dimensions(texture_index) else {
         return;
@@ -128,9 +128,9 @@ fn draw_wall_column(
     }
 }
 
-fn draw_minimap(framebuffer: &mut Framebuffer, player: &Player) {
-    let map_width_px = MAP_WIDTH as i32 * MINIMAP_CELL_SIZE;
-    let map_height_px = MAP_HEIGHT as i32 * MINIMAP_CELL_SIZE;
+fn draw_minimap(framebuffer: &mut Framebuffer, map: &MapGrid, player: &Player) {
+    let map_width_px = map.width as i32 * MINIMAP_CELL_SIZE;
+    let map_height_px = map.height as i32 * MINIMAP_CELL_SIZE;
     let origin_x = MINIMAP_PADDING;
     let origin_y = MINIMAP_PADDING;
 
@@ -143,9 +143,9 @@ fn draw_minimap(framebuffer: &mut Framebuffer, player: &Player) {
     );
     framebuffer.draw_rect(origin_x, origin_y, map_width_px, map_height_px, MINIMAP_BG_COLOR);
 
-    for (y, row) in MAP.iter().enumerate() {
-        for (x, cell) in row.iter().enumerate() {
-            if *cell == 1 {
+    for y in 0..map.height {
+        for x in 0..map.width {
+            if map.get(x, y) == 1 {
                 framebuffer.draw_rect(
                     origin_x + x as i32 * MINIMAP_CELL_SIZE,
                     origin_y + y as i32 * MINIMAP_CELL_SIZE,

@@ -1,7 +1,7 @@
 /// Raycasting clasico usando el algoritmo DDA el mismo enfoque que usa Wolfenstein 3D / lodev's raycasting tutorial. 
 /// Para cada rayo avanzamos celda por celda, siempre saltando a la siguiente linea de grid (vertical u horizontal) mas cercana, hasta encontrar un muro.
 
-use crate::map::is_wall;
+use crate::map::MapGrid;
 use crate::player::Player;
 
 pub struct RayHit {
@@ -15,7 +15,7 @@ pub struct RayHit {
     pub map_y: i32,
 }
 
-pub fn cast_ray(player: &Player, ray_angle: f32) -> RayHit {
+pub fn cast_ray(map: &MapGrid, player: &Player, ray_angle: f32) -> RayHit {
     let ray_dir_x = ray_angle.cos();
     let ray_dir_y = ray_angle.sin();
 
@@ -71,7 +71,7 @@ pub fn cast_ray(player: &Player, ray_angle: f32) -> RayHit {
             vertical_wall = false;
         }
 
-        if is_wall(map_x as f32, map_y as f32) {
+        if map.is_wall(map_x as f32, map_y as f32) {
             hit = true;
             break;
         }

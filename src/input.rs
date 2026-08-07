@@ -2,9 +2,10 @@
 
 use raylib::prelude::*;
 
+use crate::map::MapGrid;
 use crate::player::Player;
 
-pub fn handle_input(window: &RaylibHandle, player: &mut Player, delta_time: f32) {
+pub fn handle_input(window: &RaylibHandle, player: &mut Player, map: &MapGrid, delta_time: f32) {
     if window.is_key_down(KeyboardKey::KEY_A) {
         player.rotate(-player.rot_speed * delta_time);
     }
@@ -24,6 +25,6 @@ pub fn handle_input(window: &RaylibHandle, player: &mut Player, delta_time: f32)
         let step = player.move_speed * delta_time * move_dir;
         let dx = player.angle.cos() * step;
         let dy = player.angle.sin() * step;
-        player.try_move(dx, dy);
+        player.try_move(dx, dy, map);
     }
 }
