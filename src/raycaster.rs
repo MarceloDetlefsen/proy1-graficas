@@ -11,6 +11,8 @@ pub struct RayHit {
     // false si golpeo una pared "horizontal" (moviendose en y). Solo se
     // usa para variar un poco el tono de color entre paredes N-S y E-O.
     pub vertical_wall: bool,
+    pub map_x: i32,
+    pub map_y: i32,
 }
 
 pub fn cast_ray(player: &Player, ray_angle: f32) -> RayHit {
@@ -86,5 +88,7 @@ pub fn cast_ray(player: &Player, ray_angle: f32) -> RayHit {
     RayHit {
         distance: perp_dist.abs(),
         vertical_wall,
+        map_x,
+        map_y,
     }
 }

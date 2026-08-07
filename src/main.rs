@@ -4,12 +4,14 @@ mod map;
 mod player;
 mod raycaster;
 mod renderer;
+mod textures;
 
 use framebuffer::Framebuffer;
 use input::handle_input;
 use map::{PLAYER_START_ANGLE, PLAYER_START_X, PLAYER_START_Y};
 use player::Player;
 use raylib::prelude::*;
+use textures::TextureManager;
 
 fn main() {
     let screen_width: u32 = 800;
@@ -24,6 +26,7 @@ fn main() {
     window.set_target_fps(60);
 
     let mut framebuffer = Framebuffer::new(screen_width, screen_height, Color::BLACK);
+    let texture_manager = TextureManager::new();
 
     let mut player = Player::new(PLAYER_START_X, PLAYER_START_Y, PLAYER_START_ANGLE);
     let mut show_minimap = false;
@@ -40,6 +43,7 @@ fn main() {
         renderer::render(
             &mut framebuffer,
             &player,
+            &texture_manager,
             screen_width,
             screen_height,
             show_minimap,

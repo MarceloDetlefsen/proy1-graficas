@@ -1,75 +1,72 @@
-// textures.rs
-
 use raylib::prelude::*;
-use std::collections::HashMap;
-use std::slice;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 pub struct TextureManager {
-    images: HashMap<char, Image>,       // Store images for pixel access
-    textures: HashMap<char, Texture2D>, // Store GPU textures for rendering
+    wall_textures: Vec<Image>,
 }
 
 impl TextureManager {
-    pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread) -> Self {
-        let mut images = HashMap::new();
-        let mut textures = HashMap::new();
+    pub fn new() -> Self {
+        let wall_textures = load_wall_textures("assets/walls");
 
-        // Map characters to texture file paths
-        let texture_files = vec![
-            ('+', "assets/wall4.png"),
-            ('-', "assets/wall2.png"),
-            ('|', "assets/wall1.png"),
-            ('g', "assets/wall5.png"),
-            ('#', "assets/wall3.png"), // default/fallback
-        ];
-
-        for (ch, path) in texture_files {
-            let image = Image::load_image(path).expect(&format!("Failed to load image {}", path));
-            let texture = rl.load_texture(thread, path).expect(&format!("Failed to load texture {}", path));
-            images.insert(ch, image);
-            textures.insert(ch, texture);
-        }
-
-        TextureManager { images, textures }
+        Self { wall_textures }
     }
 
-    pub fn get_pixel_color(&self, ch: char, tx: u32, ty: u32) -> Color {
-        if let Some(image) = self.images.get(&ch) {
-            let x = tx.min(image.width as u32 - 1) as i32;
-            let y = ty.min(image.height as u32 - 1) as i32;
-            get_pixel_color(image, x, y)
-        } else {
-            Color::WHITE
-        }
+    pub fn wall_count(&self) -> usize {
+        self.wall_textures.len()
     }
 
-    pub fn get_texture(&self, ch: char) -> Option<&Texture2D> {
-        self.textures.get(&ch)
+    pub fn wall_dimensions(&self, index: usize) -> Option<(i32, i32)> {
+        self.wall_textures.get(index).map(|image| (image.width(), image.height()))
+    }
+
+    pub fn wall_pixel_color(&self, index: usize, tx: u32, ty: u32) -> Color {
+        self.wall_textures.get(index).map_or(Color::WHITE, |image| {
+            let width = image.width().max(1) as u32;
+            let height = image.height().max(1) as u32;
+            let x = tx.min(width - 1) as i32;
+            let y = ty.min(height - 1) as i32;
+            image.get_color(x, y)
+        })
     }
 }
 
-fn get_pixel_color(image: &Image, x: i32, y: i32) -> Color {
-    let width = image.width as usize;
-    let height = image.height as usize;
+fn load_wall_textures(dir: &str) -> Vec<Image> {
+    let mut paths = list_image_paths(dir);
+    paths.sort();
 
-    if x < 0 || y < 0 || x as usize >= width || y as usize >= height {
-        return Color::WHITE;
-    }
-
-    let x = x as usize;
-    let y = y as usize;
-
-    let data_len = width * height * 4;
-
-    unsafe {
-        let data = slice::from_raw_parts(image.data as *const u8, data_len);
-
-        let idx = (y * width + x) * 4;
-
-        if idx + 3 >= data_len {
-            return Color::WHITE;
+    let mut images = Vec::with_capacity(paths.len());
+    for path in paths {
+        match Image::load_image(path.to_string_lossy().as_ref()) {
+            Ok(image) => images.push(image),
+            Err(_) => {
+                // Skip files that exist but cannot be decoded by raylib.
+            }
         }
-
-        Color::new(data[idx], data[idx + 1], data[idx + 2], data[idx + 3])
     }
+
+    if images.is_empty() {
+        images.push(Image::gen_image_color(64, 64, Color::MAGENTA));
+    }
+
+    images
+}
+
+fn list_image_paths(dir: &str) -> Vec<PathBuf> {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return Vec::new();
+    };
+
+    entries
+        .filter_map(|entry| entry.ok().map(|e| e.path()))
+        .filter(|path| is_supported_image(path))
+        .collect()
+}
+
+fn is_supported_image(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|ext| ext.to_str()).map(|ext| ext.to_ascii_lowercase()),
+        Some(ext) if ext == "png" || ext == "jpg" || ext == "jpeg"
+    )
 }
