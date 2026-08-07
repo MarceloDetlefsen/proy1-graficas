@@ -15,6 +15,7 @@ const FLOOR_COLOR: Color = Color::new(55, 55, 55, 255);
 const MINIMAP_BG_COLOR: Color = Color::new(18, 18, 22, 255);
 const MINIMAP_WALL_COLOR: Color = Color::new(210, 210, 210, 255);
 const MINIMAP_PLAYER_COLOR: Color = Color::new(255, 70, 70, 255);
+const MINIMAP_FACING_COLOR: Color = Color::new(255, 220, 90, 255);
 const MINIMAP_CELL_SIZE: i32 = 8;
 const MINIMAP_PADDING: i32 = 8;
 const MINIMAP_BORDER: i32 = 2;
@@ -162,4 +163,9 @@ fn draw_minimap(framebuffer: &mut Framebuffer, map: &MapGrid, player: &Player) {
     let player_y = origin_y + (player.y * MINIMAP_CELL_SIZE as f32) as i32;
 
     framebuffer.draw_rect(player_x - 2, player_y - 2, 4, 4, MINIMAP_PLAYER_COLOR);
+
+    let dir_length = 10.0;
+    let dir_x = player_x + (player.angle.cos() * dir_length) as i32;
+    let dir_y = player_y + (player.angle.sin() * dir_length) as i32;
+    framebuffer.draw_line(player_x, player_y, dir_x, dir_y, MINIMAP_FACING_COLOR);
 }

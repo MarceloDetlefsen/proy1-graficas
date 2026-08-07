@@ -37,6 +37,11 @@ impl Framebuffer {
         self.color_buffer.draw_rectangle(x, y, width, height, color);
     }
 
+    pub fn draw_line(&mut self, start_x: i32, start_y: i32, end_x: i32, end_y: i32, color: Color) {
+        self.color_buffer
+            .draw_line(start_x, start_y, end_x, end_y, color);
+    }
+
     pub fn clear(&mut self, color: Color) {
         self.color_buffer
             .draw_rectangle(0, 0, self.color_buffer.width(), self.color_buffer.height(), color);
