@@ -1,10 +1,7 @@
 use raylib::prelude::*;
 use raylib::texture::Image;
 
-/// Same Framebuffer used in the polygon-fill / Game of Life labs, extended
-/// with a `draw_rect` helper so the raycaster can fill ceiling/floor/wall
-/// columns without looping pixel-by-pixel in Rust (the Image drawing calls
-/// are done in raylib's C side, which is much faster for big solid blocks).
+/// El mismo framebuffer usado en los laboratorios de polygon-fill / Game of Life, extendido con un helper `draw_rect` para que el raycaster pueda llenar columnas de techo/suelo/pared sin recorrer píxel por píxel.
 pub struct Framebuffer {
     color_buffer: Image,
 }
@@ -16,8 +13,7 @@ impl Framebuffer {
         Self { color_buffer }
     }
 
-    /// Fills a rectangle directly on the image buffer. Used for ceiling,
-    /// floor, and each vertical wall "column" the raycaster produces.
+    /// Rellena un rectángulo directamente sobre el buffer de imagen. Se usa para el techo, el suelo y cada "columna" vertical de pared que produce el raycaster.
     pub fn draw_rect(&mut self, x: i32, y: i32, width: i32, height: i32, color: Color) {
         if width <= 0 || height <= 0 {
             return;

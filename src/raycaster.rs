@@ -1,20 +1,15 @@
-// Fase 3: raycasting clasico usando el algoritmo DDA (digital differential
-// analysis), el mismo enfoque que usa Wolfenstein 3D / lodev's raycasting
-// tutorial. Para cada rayo avanzamos celda por celda, siempre saltando a
-// la siguiente linea de grid (vertical u horizontal) mas cercana, hasta
-// encontrar un muro.
+/// Raycasting clasico usando el algoritmo DDA el mismo enfoque que usa Wolfenstein 3D / lodev's raycasting tutorial. 
+/// Para cada rayo avanzamos celda por celda, siempre saltando a la siguiente linea de grid (vertical u horizontal) mas cercana, hasta encontrar un muro.
 
 use crate::map::is_wall;
 use crate::player::Player;
 
 pub struct RayHit {
-    /// Distancia perpendicular (ya corregida contra el efecto fish-eye,
-    /// porque se mide a lo largo del eje de la camara, no en linea recta
-    /// desde el jugador).
+    // Distancia perpendicular desde el jugador hasta la pared golpeada, en unidades de mapa.
     pub distance: f32,
-    /// true si el rayo golpeo una pared "vertical" (moviendose en x),
-    /// false si golpeo una pared "horizontal" (moviendose en y). Solo se
-    /// usa para variar un poco el tono de color entre paredes N-S y E-O.
+    // true si el rayo golpeo una pared "vertical" (moviendose en x),
+    // false si golpeo una pared "horizontal" (moviendose en y). Solo se
+    // usa para variar un poco el tono de color entre paredes N-S y E-O.
     pub vertical_wall: bool,
 }
 
@@ -61,8 +56,7 @@ pub fn cast_ray(player: &Player, ray_angle: f32) -> RayHit {
     let mut hit = false;
     let mut vertical_wall = true;
 
-    // Tope de iteraciones como red de seguridad para nunca hacer un loop
-    // infinito si algo del mapa esta mal formado.
+    // Tope de iteraciones como red de seguridad para nunca hacer un loop infinito si algo del mapa esta mal formado.
     let max_steps = 200;
     for _ in 0..max_steps {
         if side_dist_x < side_dist_y {

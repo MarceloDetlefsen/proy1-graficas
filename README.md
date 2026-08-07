@@ -1,5 +1,4 @@
-# Raycaster prototype
-
+# Proyecto #1: Raycasting
 Prototipo de raycasting pseudo-3D (estilo Wolfenstein 3D / DOOM de SNES),
 sin HUD, sprites, texturas ni enemigos. Solo el sistema de renderizado.
 

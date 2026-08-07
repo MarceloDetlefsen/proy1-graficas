@@ -1,9 +1,5 @@
-// Fase 2: jugador.
-//
-// Guarda posicion (x, y) en punto flotante, angulo de vision, y
-// velocidades de movimiento/rotacion. try_move() aplica colision
-// contra muros revisando cada eje por separado, lo que de paso permite
-// "deslizarse" a lo largo de una pared en vez de quedar pegado.
+/// Guarda posicion (x, y) en punto flotante, angulo de vision, y velocidades de movimiento/rotacion. try_move() aplica colision
+/// contra muros revisando cada eje por separado, lo que de paso permite "deslizarse" a lo largo de una pared en vez de quedar pegado.
 
 use crate::map::is_wall;
 
@@ -30,9 +26,7 @@ impl Player {
         self.angle += delta_angle;
     }
 
-    /// Intenta mover al jugador por (dx, dy). Cada eje se comprueba por
-    /// separado contra el mapa, con un pequeno margen para que la camara
-    /// no quede pegada justo en el borde de la pared.
+    /// Intenta mover al jugador por (dx, dy). Cada eje se comprueba por separado contra el mapa, con un pequeno margen para que la camara no quede pegada justo en el borde de la pared.
     pub fn try_move(&mut self, dx: f32, dy: f32) {
         const WALL_MARGIN: f32 = 0.2;
 

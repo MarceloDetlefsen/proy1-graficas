@@ -1,4 +1,4 @@
-// Manejo de input: W/S para avanzar y retroceder, A/D para rotar.
+/// Manejo de input: W/S para avanzar y retroceder, A/D para rotar.
 
 use raylib::prelude::*;
 

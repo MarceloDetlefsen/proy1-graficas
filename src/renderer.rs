@@ -1,8 +1,4 @@
-// Fase 4: render pseudo-3D.
-//
-// Sin texturas, sin iluminacion, sin sprites. Solo tres colores solidos:
-// techo, piso, y columnas verticales para las paredes, escaladas segun
-// la distancia que devolvio el raycaster.
+/// Render pseudo-3D:  Sin texturas, sin iluminacion, sin sprites. Solo tres colores solidos: techo, piso, y columnas verticales para las paredes, escaladas segun la distancia que devolvio el raycaster.
 
 use raylib::prelude::*;
 
@@ -51,9 +47,7 @@ pub fn render(
 
         let hit = cast_ray(player, ray_angle);
 
-        // La correccion de fish-eye ya viene aplicada en cast_ray porque
-        // devuelve la distancia perpendicular al plano de la camara, no
-        // la distancia en linea recta desde el jugador al muro.
+        // La correccion de fish-eye ya viene aplicada en cast_ray porque devuelve la distancia perpendicular al plano de la camara, no la distancia en linea recta desde el jugador al muro.
         let distance = hit.distance.max(0.0001);
 
         let wall_height = (screen_height as f32 / distance) as i32;

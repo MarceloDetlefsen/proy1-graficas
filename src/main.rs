@@ -1,7 +1,3 @@
-// Prototipo de raycaster pseudo-3D estilo Wolfenstein 3D / DOOM SNES.
-// Sin HUD, sin sprites, sin texturas, sin enemigos: solo el sistema de
-// renderizado (mapa -> jugador -> rayos -> columnas verticales).
-
 mod framebuffer;
 mod input;
 mod map;
@@ -38,11 +34,9 @@ fn main() {
         if window.is_key_pressed(KeyboardKey::KEY_M) {
             show_minimap = !show_minimap;
         }
-
-        // Fase 2/5: input y movimiento del jugador dentro del laberinto.
+        
         handle_input(&window, &mut player, delta_time);
 
-        // Fase 3/4: un rayo por columna, dibujado como techo/piso/paredes.
         renderer::render(
             &mut framebuffer,
             &player,
