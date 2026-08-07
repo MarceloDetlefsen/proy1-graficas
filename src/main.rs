@@ -1,4 +1,5 @@
 mod framebuffer;
+mod colors;
 mod game_state;
 mod input;
 mod level_data;
@@ -9,6 +10,7 @@ mod renderer;
 mod textures;
 
 use framebuffer::Framebuffer;
+use colors::{NBA_CREAM, NBA_NAVY, NBA_ORANGE};
 use game_state::GameState;
 use level_data::{build_level, Level};
 use input::handle_input;
@@ -108,27 +110,36 @@ fn update_welcome(
         *selected_level = (*selected_level + 1).min(3);
     }
 
-    framebuffer.clear(Color::BLACK);
+    framebuffer.clear(NBA_NAVY);
     framebuffer.swap_buffers(window, raylib_thread, |draw| {
-        draw.draw_text("ENCESTA PARA AVANZAR", 140, 120, 34, Color::WHITE);
-        draw.draw_text("Selecciona nivel:", 270, 205, 24, Color::RAYWHITE);
+        let title = "NBA RAYCASTING";
+        let title_font = 34;
+        let title_width = draw.measure_text(title, title_font);
+        let icon_size = 28;
+        let icon_gap = 12;
+        let combo_width = icon_size + icon_gap + title_width;
+        let start_x = (screen_width as i32 - combo_width) / 2;
+        draw_basketball_icon(draw, start_x, 94, icon_size);
+        draw.draw_text(title, start_x + icon_size + icon_gap, 100, title_font, NBA_ORANGE);
+
+        draw.draw_text("Selecciona nivel:", 270, 205, 24, NBA_CREAM);
 
         let labels = ["[1]", "[2]", "[3]"];
         let colors = [
             if *selected_level == 1 {
-                Color::GOLD
+                NBA_ORANGE
             } else {
-                Color::LIGHTGRAY
+                NBA_CREAM
             },
             if *selected_level == 2 {
-                Color::GOLD
+                NBA_ORANGE
             } else {
-                Color::LIGHTGRAY
+                NBA_CREAM
             },
             if *selected_level == 3 {
-                Color::GOLD
+                NBA_ORANGE
             } else {
-                Color::LIGHTGRAY
+                NBA_CREAM
             },
         ];
         let font_size = 28;
@@ -149,7 +160,7 @@ fn update_welcome(
             162,
             300,
             20,
-            Color::LIGHTGRAY,
+            NBA_CREAM,
         );
     });
 
@@ -191,24 +202,22 @@ fn update_playing(
         framebuffer,
         player,
         &level.grid,
+        &level.hoop_positions,
         texture_manager,
         screen_width,
         screen_height,
         show_minimap,
     );
 
-    let hud_text = format!(
-        "Nivel {} - {} - Aros: {}/{}",
-        current_level_index,
-        level.level_name,
-        *hoops_scored,
-        level.hoops_required
-    );
-
     framebuffer.swap_buffers(window, raylib_thread, |draw| {
-        let box_width = draw.measure_text(&hud_text, 20) + 16;
-        draw.draw_rectangle(8, 8, box_width, 30, Color::new(0, 0, 0, 180));
-        draw.draw_text(&hud_text, 16, 14, 20, Color::WHITE);
+        renderer::draw_hud(
+            draw,
+            screen_width,
+            current_level_index,
+            &level.level_name,
+            *hoops_scored,
+            level.hoops_required,
+        );
     });
 
     if *hoops_scored >= level.hoops_required {
@@ -228,17 +237,17 @@ fn update_level_success(
     current_level_index: u32,
     player: &mut Player,
 ) -> Option<GameState> {
-    framebuffer.clear(Color::BLACK);
+    framebuffer.clear(NBA_NAVY);
     framebuffer.swap_buffers(window, raylib_thread, |draw| {
         let title = format!("¡NIVEL {} SUPERADO!", current_level_index);
-        draw_centered_text(draw, &title, screen_width, 34, 190, Color::GOLD);
+        draw_centered_text(draw, &title, screen_width, 34, 190, NBA_ORANGE);
         draw_centered_text(
             draw,
             "Presiona ENTER para continuar",
             screen_width,
             24,
             250,
-            Color::LIGHTGRAY,
+            NBA_CREAM,
         );
     });
 
@@ -265,7 +274,7 @@ fn update_victory(
     raylib_thread: &RaylibThread,
     screen_width: u32,
 ) -> Option<GameState> {
-    framebuffer.clear(Color::BLACK);
+    framebuffer.clear(NBA_NAVY);
     framebuffer.swap_buffers(window, raylib_thread, |draw| {
         draw_centered_text(
             draw,
@@ -273,7 +282,7 @@ fn update_victory(
             screen_width,
             32,
             180,
-            Color::GOLD,
+            NBA_ORANGE,
         );
         draw_centered_text(
             draw,
@@ -281,7 +290,7 @@ fn update_victory(
             screen_width,
             24,
             250,
-            Color::LIGHTGRAY,
+            NBA_CREAM,
         );
     });
 
@@ -311,4 +320,27 @@ fn draw_centered_text(
     let text_width = draw.measure_text(text, font_size);
     let x = (screen_width as i32 - text_width) / 2;
     draw.draw_text(text, x, y, font_size, color);
+}
+
+fn draw_basketball_icon(draw: &mut RaylibDrawHandle<'_>, x: i32, y: i32, radius: i32) {
+    draw.draw_circle(x, y, radius as f32, NBA_ORANGE);
+    draw.draw_circle_lines(x, y, radius as f32, Color::new(60, 30, 10, 255));
+
+    let seam_color = Color::new(50, 25, 10, 255);
+    draw.draw_line(x - radius + 3, y, x + radius - 3, y, seam_color);
+    draw.draw_line(x, y - radius + 3, x, y + radius - 3, seam_color);
+    draw.draw_line(
+        x - radius + 5,
+        y - radius / 2,
+        x + radius - 5,
+        y + radius / 2,
+        seam_color,
+    );
+    draw.draw_line(
+        x - radius + 5,
+        y + radius / 2,
+        x + radius - 5,
+        y - radius / 2,
+        seam_color,
+    );
 }
