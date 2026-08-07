@@ -42,6 +42,14 @@ impl Framebuffer {
             .draw_line(start_x, start_y, end_x, end_y, color);
     }
 
+    pub fn width(&self) -> i32 {
+        self.color_buffer.width()
+    }
+
+    pub fn height(&self) -> i32 {
+        self.color_buffer.height()
+    }
+
     pub fn clear(&mut self, color: Color) {
         self.color_buffer
             .draw_rectangle(0, 0, self.color_buffer.width(), self.color_buffer.height(), color);
@@ -55,7 +63,23 @@ impl Framebuffer {
 
         window.draw(raylib_thread, |mut renderer| {
             if let Some(texture) = texture.as_ref() {
-                renderer.draw_texture(texture, 0, 0, Color::WHITE);
+                let screen_width = renderer.get_screen_width() as f32;
+                let screen_height = renderer.get_screen_height() as f32;
+                let source = Rectangle::new(
+                    0.0,
+                    0.0,
+                    self.color_buffer.width() as f32,
+                    self.color_buffer.height() as f32,
+                );
+                let destination = Rectangle::new(0.0, 0.0, screen_width, screen_height);
+                renderer.draw_texture_pro(
+                    texture,
+                    source,
+                    destination,
+                    Vector2::new(0.0, 0.0),
+                    0.0,
+                    Color::WHITE,
+                );
             }
 
             overlay(&mut renderer);

@@ -19,17 +19,16 @@ use raylib::prelude::*;
 use textures::TextureManager;
 
 fn main() {
-    let screen_width: u32 = 800;
-    let screen_height: u32 = 600;
-
     let (mut window, raylib_thread) = raylib::init()
-        .size(screen_width as i32, screen_height as i32)
+        .size(800, 600)
         .title("Raycaster prototype")
         .log_level(TraceLogLevel::LOG_WARNING)
         .build();
 
     window.set_target_fps(60);
 
+    let mut screen_width = window.get_screen_width().max(1) as u32;
+    let mut screen_height = window.get_screen_height().max(1) as u32;
     let mut framebuffer = Framebuffer::new(screen_width, screen_height, Color::BLACK);
     let texture_manager = TextureManager::new();
 
@@ -38,6 +37,12 @@ fn main() {
     let mut show_minimap = false;
 
     while !window.window_should_close() {
+        screen_width = window.get_screen_width().max(1) as u32;
+        screen_height = window.get_screen_height().max(1) as u32;
+        if framebuffer.width() != screen_width as i32 || framebuffer.height() != screen_height as i32 {
+            framebuffer = Framebuffer::new(screen_width, screen_height, Color::BLACK);
+        }
+
         let delta_time = window.get_frame_time();
 
         if window.is_key_pressed(KeyboardKey::KEY_M) {
@@ -51,6 +56,7 @@ fn main() {
                     &mut framebuffer,
                     &raylib_thread,
                     screen_width,
+                    screen_height,
                     selected_level,
                     &mut player,
                 )
@@ -78,6 +84,7 @@ fn main() {
                     &mut framebuffer,
                     &raylib_thread,
                     screen_width,
+                    screen_height,
                     *current_level_index,
                     &mut player,
                 ),
@@ -86,6 +93,7 @@ fn main() {
                     &mut framebuffer,
                     &raylib_thread,
                     screen_width,
+                    screen_height,
                 ),
         };
 
@@ -100,6 +108,7 @@ fn update_welcome(
     framebuffer: &mut Framebuffer,
     raylib_thread: &RaylibThread,
     screen_width: u32,
+    screen_height: u32,
     selected_level: &mut u32,
     player: &mut Player,
 ) -> Option<GameState> {
@@ -119,10 +128,12 @@ fn update_welcome(
         let icon_gap = 12;
         let combo_width = icon_size + icon_gap + title_width;
         let start_x = (screen_width as i32 - combo_width) / 2;
-        draw_basketball_icon(draw, start_x, 94, icon_size);
-        draw.draw_text(title, start_x + icon_size + icon_gap, 100, title_font, NBA_ORANGE);
+        let title_y = (screen_height as i32 * 14) / 100;
+        draw_basketball_icon(draw, start_x, title_y + 8, icon_size);
+        draw.draw_text(title, start_x + icon_size + icon_gap, title_y, title_font, NBA_ORANGE);
 
-        draw.draw_text("Selecciona nivel:", 270, 205, 24, NBA_CREAM);
+        let label_y = (screen_height as i32 * 34) / 100;
+        draw.draw_text("Selecciona nivel:", (screen_width as i32 - 180) / 2, label_y, 24, NBA_CREAM);
 
         let labels = ["[1]", "[2]", "[3]"];
         let colors = [
@@ -150,15 +161,16 @@ fn update_welcome(
             .sum::<i32>()
             + spacing * 2;
         let mut x = (screen_width as i32 - total_width) / 2;
+        let levels_y = label_y + 36;
         for (index, label) in labels.iter().enumerate() {
-            draw.draw_text(label, x, 245, font_size, colors[index]);
+            draw.draw_text(label, x, levels_y, font_size, colors[index]);
             x += draw.measure_text(label, font_size) + spacing;
         }
 
         draw.draw_text(
             "Flechas o A/D para elegir, ENTER para empezar",
-            162,
-            300,
+            (screen_width as i32 - draw.measure_text("Flechas o A/D para elegir, ENTER para empezar", 20)) / 2,
+            levels_y + 58,
             20,
             NBA_CREAM,
         );
@@ -234,19 +246,27 @@ fn update_level_success(
     framebuffer: &mut Framebuffer,
     raylib_thread: &RaylibThread,
     screen_width: u32,
+    screen_height: u32,
     current_level_index: u32,
     player: &mut Player,
 ) -> Option<GameState> {
     framebuffer.clear(NBA_NAVY);
     framebuffer.swap_buffers(window, raylib_thread, |draw| {
         let title = format!("¡NIVEL {} SUPERADO!", current_level_index);
-        draw_centered_text(draw, &title, screen_width, 34, 190, NBA_ORANGE);
+        draw_centered_text(
+            draw,
+            &title,
+            screen_width,
+            34,
+            (screen_height as i32 * 36) / 100,
+            NBA_ORANGE,
+        );
         draw_centered_text(
             draw,
             "Presiona ENTER para continuar",
             screen_width,
             24,
-            250,
+            (screen_height as i32 * 48) / 100,
             NBA_CREAM,
         );
     });
@@ -273,6 +293,7 @@ fn update_victory(
     framebuffer: &mut Framebuffer,
     raylib_thread: &RaylibThread,
     screen_width: u32,
+    screen_height: u32,
 ) -> Option<GameState> {
     framebuffer.clear(NBA_NAVY);
     framebuffer.swap_buffers(window, raylib_thread, |draw| {
@@ -281,7 +302,7 @@ fn update_victory(
             "¡CAMPEÓN! Completaste los 3 niveles",
             screen_width,
             32,
-            180,
+            (screen_height as i32 * 36) / 100,
             NBA_ORANGE,
         );
         draw_centered_text(
@@ -289,7 +310,7 @@ fn update_victory(
             "Presiona ENTER para volver al inicio",
             screen_width,
             24,
-            250,
+            (screen_height as i32 * 48) / 100,
             NBA_CREAM,
         );
     });
