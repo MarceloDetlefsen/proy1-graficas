@@ -10,7 +10,7 @@ pub struct TextureManager {
 impl TextureManager {
     pub fn new() -> Self {
         let wall_textures = load_wall_textures("assets/walls");
-        let floor_texture = load_floor_texture("assets/floor/wood.png");
+        let floor_texture = load_floor_texture("assets/floor/wood.jpg");
 
         Self {
             wall_textures,
