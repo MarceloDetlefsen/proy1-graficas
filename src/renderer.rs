@@ -3,9 +3,10 @@
 use raylib::prelude::*;
 
 use crate::colors::{NBA_CREAM, NBA_ORANGE};
+use crate::hoop::{Hoop, HoopState, SCORE_ANIM_DURATION};
 use crate::framebuffer::Framebuffer;
 use crate::map::MapGrid;
-use crate::player::Player;
+use crate::player::{normalize_angle, Player};
 use crate::raycaster::{cast_ray, RayHit};
 use crate::textures::TextureManager;
 
@@ -26,13 +27,14 @@ pub fn render(
     framebuffer: &mut Framebuffer,
     player: &Player,
     map: &MapGrid,
-    hoop_positions: &[(f32, f32)],
+    hoops: &[Hoop],
     texture_manager: &TextureManager,
     screen_width: u32,
     screen_height: u32,
     show_minimap: bool,
 ) {
     let half_height = (screen_height / 2) as i32;
+    let mut z_buffer = vec![f32::MAX; screen_width as usize];
 
     framebuffer.draw_rect(0, 0, screen_width as i32, half_height, CEILING_COLOR);
     draw_floor(framebuffer, player, texture_manager, screen_width, screen_height);
@@ -41,6 +43,7 @@ pub fn render(
         let camera_x = 2.0 * x as f32 / screen_width as f32 - 1.0;
         let ray_angle = player.angle + camera_x * (FOV / 2.0);
         let hit = cast_ray(map, player, ray_angle);
+        z_buffer[x as usize] = hit.distance;
 
         draw_wall_column(
             framebuffer,
@@ -54,8 +57,18 @@ pub fn render(
         );
     }
 
+    draw_sprites(
+        framebuffer,
+        player,
+        hoops,
+        texture_manager,
+        &z_buffer,
+        screen_width,
+        screen_height,
+    );
+
     if show_minimap {
-        draw_minimap(framebuffer, map, player, hoop_positions);
+        draw_minimap(framebuffer, map, player, hoops);
     }
 }
 
@@ -127,11 +140,6 @@ fn draw_floor(
     let ray_dir_y0 = (player.angle - FOV / 2.0).sin();
     let ray_dir_x1 = (player.angle + FOV / 2.0).cos();
     let ray_dir_y1 = (player.angle + FOV / 2.0).sin();
-    let (floor_tex_w, floor_tex_h) = texture_manager.floor_dimensions();
-
-    if floor_tex_w <= 0 || floor_tex_h <= 0 {
-        return;
-    }
 
     let screen_width_f = screen_width as f32;
 
@@ -148,11 +156,10 @@ fn draw_floor(
         let mut floor_y = player.y + row_distance * ray_dir_y0;
 
         for x in 0..screen_width as i32 {
-            let tex_x = ((floor_x.rem_euclid(1.0) * floor_tex_w as f32).floor() as i32)
-                .clamp(0, floor_tex_w - 1) as u32;
-            let tex_y = ((floor_y.rem_euclid(1.0) * floor_tex_h as f32).floor() as i32)
-                .clamp(0, floor_tex_h - 1) as u32;
-            let color = texture_manager.floor_pixel_color(tex_x, tex_y);
+            let color = texture_manager.floor_pixel_color_bilinear(
+                floor_x.rem_euclid(1.0),
+                floor_y.rem_euclid(1.0),
+            );
 
             framebuffer.set_current_color(color);
             framebuffer.set_pixel(x, y);
@@ -186,13 +193,9 @@ fn draw_wall_column(
     let texture_count = texture_manager.wall_count();
     if texture_count == 0 {
         return;
-    }
+    };
 
     let texture_index = (map.wall_texture_index(hit.map_x, hit.map_y) - 1) % texture_count;
-
-    let Some((tex_w, tex_h)) = texture_manager.wall_dimensions(texture_index) else {
-        return;
-    };
 
     let ray_dir_x = ray_angle.cos();
     let ray_dir_y = ray_angle.sin();
@@ -202,24 +205,21 @@ fn draw_wall_column(
         player.x + distance * ray_dir_x
     };
 
-    let mut tex_x = ((wall_coord.rem_euclid(1.0) * tex_w as f32).floor() as i32).clamp(0, tex_w - 1);
-
-    // Ajuste de orientacion para que el lado visible de la pared no quede espejado.
-    if hit.vertical_wall && ray_dir_x < 0.0 {
-        tex_x = tex_w - tex_x - 1;
-    }
-    if !hit.vertical_wall && ray_dir_y > 0.0 {
-        tex_x = tex_w - tex_x - 1;
-    }
-
     let visible_height = draw_end - draw_start;
     if visible_height <= 0 {
         return;
     }
 
     for y in draw_start..draw_end {
-        let tex_y = (((y - draw_start) * tex_h) / visible_height).clamp(0, tex_h - 1) as u32;
-        let color = texture_manager.wall_pixel_color(texture_index, tex_x as u32, tex_y);
+        let mut tex_u = wall_coord.rem_euclid(1.0);
+        if hit.vertical_wall && ray_dir_x < 0.0 {
+            tex_u = 1.0 - tex_u;
+        }
+        if !hit.vertical_wall && ray_dir_y > 0.0 {
+            tex_u = 1.0 - tex_u;
+        }
+        let tex_v = (y - draw_start) as f32 / visible_height as f32;
+        let color = texture_manager.wall_pixel_color_bilinear(texture_index, tex_u, tex_v);
 
         if color.a == 0 {
             continue;
@@ -234,7 +234,7 @@ fn draw_minimap(
     framebuffer: &mut Framebuffer,
     map: &MapGrid,
     player: &Player,
-    hoop_positions: &[(f32, f32)],
+    hoops: &[Hoop],
 ) {
     let cell_size = minimap_cell_size(map);
     let map_width_px = map.width as i32 * cell_size;
@@ -265,9 +265,9 @@ fn draw_minimap(
         }
     }
 
-    for &(hoop_x, hoop_y) in hoop_positions {
-        let px = origin_x + (hoop_x * cell_size as f32) as i32;
-        let py = origin_y + (hoop_y * cell_size as f32) as i32;
+    for hoop in hoops {
+        let px = origin_x + (hoop.x * cell_size as f32) as i32;
+        let py = origin_y + (hoop.y * cell_size as f32) as i32;
         let hoop_size = (cell_size / 2).max(2);
         framebuffer.draw_rect(
             px - hoop_size / 2,
@@ -292,4 +292,112 @@ fn draw_minimap(
 fn minimap_cell_size(map: &MapGrid) -> i32 {
     let max_dim = map.width.max(map.height).max(1) as i32;
     (MINIMAP_MAX_SIZE / max_dim).clamp(2, MINIMAP_CELL_SIZE)
+}
+
+fn draw_sprites(
+    framebuffer: &mut Framebuffer,
+    player: &Player,
+    hoops: &[Hoop],
+    texture_manager: &TextureManager,
+    z_buffer: &[f32],
+    screen_width: u32,
+    screen_height: u32,
+) {
+    let mut sprites: Vec<(f32, f32, f32, f32, i32, i32, i32, i32, Option<usize>)> = Vec::new();
+    let sprite_cull_limit = FOV / 2.0 + 0.3;
+    let (tex_w, tex_h) = texture_manager.hoop_dimensions();
+    if tex_w <= 0 || tex_h <= 0 {
+        return;
+    }
+
+    for hoop in hoops {
+        let dx = hoop.x - player.x;
+        let dy = hoop.y - player.y;
+        let dist = (dx * dx + dy * dy).sqrt();
+        let angle_to_sprite = dy.atan2(dx);
+        let relative_angle = normalize_angle(angle_to_sprite - player.angle);
+
+        if relative_angle.abs() > sprite_cull_limit {
+            continue;
+        }
+
+        let perp_dist = (dist * relative_angle.cos()).max(0.0001);
+        let camera_x = relative_angle / (FOV / 2.0);
+        let sprite_screen_x = ((camera_x + 1.0) / 2.0 * screen_width as f32) as i32;
+        let sprite_size = (screen_height as f32 / perp_dist) as i32;
+        if sprite_size <= 0 {
+            continue;
+        }
+
+        let draw_start_x = sprite_screen_x - sprite_size / 2;
+        let draw_end_x = sprite_screen_x + sprite_size / 2;
+        let half_height = screen_height as i32 / 2;
+        let draw_start_y = (-sprite_size / 2 + half_height).max(0);
+        let draw_end_y = (sprite_size / 2 + half_height).min(screen_height as i32);
+        if draw_end_y <= draw_start_y {
+            continue;
+        }
+
+        let frame = hoop_sprite_frame(hoop);
+        sprites.push((
+            dist,
+            perp_dist,
+            relative_angle,
+            sprite_screen_x as f32,
+            draw_start_x,
+            draw_end_x,
+            draw_start_y,
+            draw_end_y,
+            frame,
+        ));
+    }
+
+    sprites.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+
+    for (_, perp_dist, _, _, draw_start_x, draw_end_x, draw_start_y, draw_end_y, frame) in sprites {
+        let width = (draw_end_x - draw_start_x).max(1);
+        let height = (draw_end_y - draw_start_y).max(1);
+
+        for sx in draw_start_x.max(0)..draw_end_x.min(screen_width as i32) {
+            if sx < 0 || sx >= screen_width as i32 {
+                continue;
+            }
+            if z_buffer[sx as usize] < perp_dist {
+                continue;
+            }
+
+        let tex_x = (((sx - draw_start_x) as f32 / width as f32) * tex_w as f32)
+                .clamp(0.0, tex_w as f32 - 1.0) as u32;
+
+            for sy in draw_start_y.max(0)..draw_end_y.min(screen_height as i32) {
+                let tex_y = (((sy - draw_start_y) as f32 / height as f32) * tex_h as f32)
+                    .clamp(0.0, tex_h as f32 - 1.0) as u32;
+                let color = texture_manager.hoop_pixel_color(frame, tex_x, tex_y);
+
+                if color.a == 0 {
+                    continue;
+                }
+
+                framebuffer.set_current_color(color);
+                framebuffer.set_pixel(sx, sy);
+            }
+        }
+    }
+}
+
+fn hoop_sprite_frame(hoop: &Hoop) -> Option<usize> {
+    match hoop.state {
+        HoopState::Pending => None,
+        HoopState::Scored if hoop.score_anim_timer <= 0.0 => None,
+        HoopState::Scored => {
+            let progress = 1.0 - (hoop.score_anim_timer / SCORE_ANIM_DURATION).clamp(0.0, 1.0);
+            Some(if progress < 1.0 / 3.0 {
+                0
+            } else if progress < 2.0 / 3.0 {
+                1
+            } else {
+                2
+            })
+        }
+    }
 }
