@@ -7,20 +7,23 @@ pub struct TextureManager {
     floor_texture: Image,
     hoop_idle: Image,
     hoop_score_frames: Vec<Image>,
+    basketball: Texture2D,
 }
 
 impl TextureManager {
-    pub fn new() -> Self {
+    pub fn new(window: &mut RaylibHandle, raylib_thread: &RaylibThread) -> Self {
         let wall_textures = load_wall_textures("assets/walls");
         let floor_texture = load_floor_texture("assets/floor/wood.jpg");
         let hoop_idle = load_hoop_idle("assets/sprites/hoop_idle.png");
         let hoop_score_frames = load_hoop_score_frames("assets/sprites");
+        let basketball = load_basketball_texture(window, raylib_thread, "assets/ball/basketball.png");
 
         Self {
             wall_textures,
             floor_texture,
             hoop_idle,
             hoop_score_frames,
+            basketball,
         }
     }
 
@@ -56,6 +59,10 @@ impl TextureManager {
         let x = tx.min(width - 1) as i32;
         let y = ty.min(height - 1) as i32;
         image.get_color(x, y)
+    }
+
+    pub fn basketball_texture(&self) -> &Texture2D {
+        &self.basketball
     }
 }
 
@@ -106,6 +113,26 @@ fn load_hoop_score_frames(dir: &str) -> Vec<Image> {
     }
 
     frames
+}
+
+fn load_basketball_texture(
+    window: &mut RaylibHandle,
+    raylib_thread: &RaylibThread,
+    path: &str,
+) -> Texture2D {
+    let image = match Image::load_image(path) {
+        Ok(image) => image,
+        Err(_) => generate_basketball_fallback(),
+    };
+
+    window
+        .load_texture_from_image(raylib_thread, &image)
+        .unwrap_or_else(|_| {
+            let fallback = Image::gen_image_color(64, 64, Color::MAGENTA);
+            window
+                .load_texture_from_image(raylib_thread, &fallback)
+                .expect("failed to create fallback basketball texture")
+        })
 }
 
 fn generate_floor_fallback() -> Image {
@@ -172,6 +199,21 @@ fn generate_hoop_frame(frame_index: usize, alpha: u8, scored: bool) -> Image {
     for (x0, y0, x1, y1) in lines {
         image.draw_line(x0, y0, x1, y1, net_color);
     }
+
+    image
+}
+
+fn generate_basketball_fallback() -> Image {
+    let mut image = Image::gen_image_color(64, 64, Color::new(0, 0, 0, 0));
+    let orange = Color::new(255, 140, 0, 255);
+    let seam = Color::new(60, 30, 10, 255);
+
+    image.draw_circle(32, 32, 28, orange);
+    image.draw_circle_lines(32, 32, 28, seam);
+    image.draw_line(4, 32, 60, 32, seam);
+    image.draw_line(32, 4, 32, 60, seam);
+    image.draw_line(10, 16, 54, 48, seam);
+    image.draw_line(10, 48, 54, 16, seam);
 
     image
 }

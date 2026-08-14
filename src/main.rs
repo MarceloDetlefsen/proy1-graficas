@@ -39,7 +39,7 @@ fn main() {
         RENDER_HEIGHT,
         Color::BLACK,
     );
-    let texture_manager = TextureManager::new();
+    let texture_manager = TextureManager::new(&mut window, &raylib_thread);
 
     let mut game_state = GameState::Welcome { selected_level: 1 };
     let mut player = Player::new(0.0, 0.0, 0.0);
@@ -275,7 +275,7 @@ fn update_playing(
         );
 
         draw_feedback_message(draw, screen_width, screen_height, feedback_message.as_deref());
-        draw_basketball_overlay(draw, screen_width, screen_height);
+        draw_basketball_overlay(draw, screen_width, screen_height, texture_manager.basketball_texture());
     });
 
     if *hoops_scored >= level.hoops_required && *level_complete_timer <= 0.0 {
@@ -447,13 +447,27 @@ fn draw_feedback_message(
     draw.draw_text(message, x, y, font_size, color);
 }
 
-fn draw_basketball_overlay(draw: &mut RaylibDrawHandle<'_>, screen_width: u32, screen_height: u32) {
-    let x = (screen_width / 2) as i32;
-    let y = screen_height as i32 - 40;
-    let radius = 18;
-    draw.draw_circle(x, y, radius as f32, NBA_ORANGE);
-    draw.draw_circle_lines(x, y, radius as f32, Color::new(60, 30, 10, 255));
-    draw.draw_line(x - radius + 4, y, x + radius - 4, y, Color::new(40, 20, 8, 255));
-    draw.draw_line(x, y - radius + 4, x, y + radius - 4, Color::new(40, 20, 8, 255));
-    draw.draw_line(x - radius + 5, y - 5, x + radius - 5, y + 4, Color::new(40, 20, 8, 255));
+fn draw_basketball_overlay(
+    draw: &mut RaylibDrawHandle<'_>,
+    screen_width: u32,
+    screen_height: u32,
+    basketball: &Texture2D,
+) {
+    let dest_w = 48.0;
+    let dest_h = 48.0;
+    let x = screen_width as f32 / 2.0 - dest_w / 2.0;
+    let y = screen_height as f32 - dest_h - 12.0;
+    let tex_w = basketball.width().max(1) as f32;
+    let tex_h = basketball.height().max(1) as f32;
+    let source = Rectangle::new(0.0, 0.0, tex_w, tex_h);
+    let dest = Rectangle::new(x, y, dest_w, dest_h);
+
+    draw.draw_texture_pro(
+        basketball,
+        source,
+        dest,
+        Vector2::new(0.0, 0.0),
+        0.0,
+        Color::WHITE,
+    );
 }
