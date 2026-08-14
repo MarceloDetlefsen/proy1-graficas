@@ -5,16 +5,22 @@ use std::path::{Path, PathBuf};
 pub struct TextureManager {
     wall_textures: Vec<Image>,
     floor_texture: Image,
+    hoop_idle: Image,
+    hoop_score_frames: Vec<Image>,
 }
 
 impl TextureManager {
     pub fn new() -> Self {
         let wall_textures = load_wall_textures("assets/walls");
         let floor_texture = load_floor_texture("assets/floor/wood.jpg");
+        let hoop_idle = load_hoop_idle("assets/sprites/hoop_idle.png");
+        let hoop_score_frames = load_hoop_score_frames("assets/sprites");
 
         Self {
             wall_textures,
             floor_texture,
+            hoop_idle,
+            hoop_score_frames,
         }
     }
 
@@ -22,30 +28,34 @@ impl TextureManager {
         self.wall_textures.len()
     }
 
-    pub fn wall_dimensions(&self, index: usize) -> Option<(i32, i32)> {
-        self.wall_textures.get(index).map(|image| (image.width(), image.height()))
+    pub fn wall_pixel_color_bilinear(&self, index: usize, u: f32, v: f32) -> Color {
+        self.wall_textures
+            .get(index)
+            .map_or(Color::WHITE, |image| sample_image_bilinear(image, u, v))
     }
 
-    pub fn wall_pixel_color(&self, index: usize, tx: u32, ty: u32) -> Color {
-        self.wall_textures.get(index).map_or(Color::WHITE, |image| {
-            let width = image.width().max(1) as u32;
-            let height = image.height().max(1) as u32;
-            let x = tx.min(width - 1) as i32;
-            let y = ty.min(height - 1) as i32;
-            image.get_color(x, y)
-        })
+    pub fn floor_pixel_color_bilinear(&self, u: f32, v: f32) -> Color {
+        sample_image_bilinear(&self.floor_texture, u, v)
     }
 
-    pub fn floor_dimensions(&self) -> (i32, i32) {
-        (self.floor_texture.width().max(1), self.floor_texture.height().max(1))
+    pub fn hoop_dimensions(&self) -> (i32, i32) {
+        (self.hoop_idle.width().max(1), self.hoop_idle.height().max(1))
     }
 
-    pub fn floor_pixel_color(&self, tx: u32, ty: u32) -> Color {
-        let width = self.floor_texture.width().max(1) as u32;
-        let height = self.floor_texture.height().max(1) as u32;
+    pub fn hoop_pixel_color(&self, frame: Option<usize>, tx: u32, ty: u32) -> Color {
+        let image = match frame {
+            None => &self.hoop_idle,
+            Some(index) => self
+                .hoop_score_frames
+                .get(index)
+                .unwrap_or(&self.hoop_idle),
+        };
+
+        let width = image.width().max(1) as u32;
+        let height = image.height().max(1) as u32;
         let x = tx.min(width - 1) as i32;
         let y = ty.min(height - 1) as i32;
-        self.floor_texture.get_color(x, y)
+        image.get_color(x, y)
     }
 }
 
@@ -77,6 +87,27 @@ fn load_floor_texture(path: &str) -> Image {
     }
 }
 
+fn load_hoop_idle(path: &str) -> Image {
+    match Image::load_image(path) {
+        Ok(image) => image,
+        Err(_) => generate_hoop_idle_fallback(),
+    }
+}
+
+fn load_hoop_score_frames(dir: &str) -> Vec<Image> {
+    let mut frames = Vec::with_capacity(3);
+
+    for index in 0..3 {
+        let path = format!("{dir}/hoop_score_{index}.png");
+        match Image::load_image(&path) {
+            Ok(image) => frames.push(image),
+            Err(_) => frames.push(generate_hoop_score_fallback(index)),
+        }
+    }
+
+    frames
+}
+
 fn generate_floor_fallback() -> Image {
     let mut image = Image::gen_image_color(64, 64, Color::new(150, 105, 65, 255));
 
@@ -102,6 +133,49 @@ fn generate_floor_fallback() -> Image {
     image
 }
 
+fn generate_hoop_idle_fallback() -> Image {
+    generate_hoop_frame(0, 255, false)
+}
+
+fn generate_hoop_score_fallback(frame_index: usize) -> Image {
+    let alpha = if frame_index == 2 { 150 } else { 255 };
+    generate_hoop_frame(frame_index, alpha, true)
+}
+
+fn generate_hoop_frame(frame_index: usize, alpha: u8, scored: bool) -> Image {
+    let mut image = Image::gen_image_color(64, 64, Color::new(0, 0, 0, 0));
+    let orange = Color::new(255, 140, 0, alpha);
+    let rim = Rectangle::new(18.0, 16.0, 28.0, 12.0);
+
+    for thickness in 0..4 {
+        image.draw_circle_lines(32, 22 + thickness, 14 - thickness, orange);
+    }
+
+    image.draw_rectangle_lines(rim, 2, orange);
+
+    let net_color = Color::new(245, 245, 245, alpha.saturating_sub(30));
+    let offset = match frame_index {
+        0 => 0,
+        1 => 2,
+        _ => -2,
+    };
+    let wave = if scored { 2 } else { 0 };
+
+    let lines = [
+        (22, 28, 26 + offset, 44 + wave),
+        (27, 28, 30 + offset, 47 + wave),
+        (32, 28, 32 + offset, 48 + wave),
+        (37, 28, 34 + offset, 47 + wave),
+        (42, 28, 38 + offset, 44 + wave),
+    ];
+
+    for (x0, y0, x1, y1) in lines {
+        image.draw_line(x0, y0, x1, y1, net_color);
+    }
+
+    image
+}
+
 fn list_image_paths(dir: &str) -> Vec<PathBuf> {
     let Ok(entries) = fs::read_dir(dir) else {
         return Vec::new();
@@ -117,5 +191,40 @@ fn is_supported_image(path: &Path) -> bool {
     matches!(
         path.extension().and_then(|ext| ext.to_str()).map(|ext| ext.to_ascii_lowercase()),
         Some(ext) if ext == "png" || ext == "jpg" || ext == "jpeg"
+    )
+}
+
+fn sample_image_bilinear(image: &Image, u: f32, v: f32) -> Color {
+    let width = image.width().max(1) as f32;
+    let height = image.height().max(1) as f32;
+
+    let x = u.clamp(0.0, 0.999_999) * (width - 1.0);
+    let y = v.clamp(0.0, 0.999_999) * (height - 1.0);
+
+    let x0 = x.floor() as i32;
+    let y0 = y.floor() as i32;
+    let x1 = (x0 + 1).min(image.width() - 1);
+    let y1 = (y0 + 1).min(image.height() - 1);
+
+    let tx = x - x0 as f32;
+    let ty = y - y0 as f32;
+
+    let c00 = image.get_color(x0, y0);
+    let c10 = image.get_color(x1, y0);
+    let c01 = image.get_color(x0, y1);
+    let c11 = image.get_color(x1, y1);
+
+    lerp_color(lerp_color(c00, c10, tx), lerp_color(c01, c11, tx), ty)
+}
+
+fn lerp_color(a: Color, b: Color, t: f32) -> Color {
+    let t = t.clamp(0.0, 1.0);
+    let inv_t = 1.0 - t;
+
+    Color::new(
+        (a.r as f32 * inv_t + b.r as f32 * t).round() as u8,
+        (a.g as f32 * inv_t + b.g as f32 * t).round() as u8,
+        (a.b as f32 * inv_t + b.b as f32 * t).round() as u8,
+        (a.a as f32 * inv_t + b.a as f32 * t).round() as u8,
     )
 }

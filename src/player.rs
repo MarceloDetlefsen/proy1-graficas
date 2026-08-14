@@ -47,3 +47,17 @@ impl Player {
         }
     }
 }
+
+/// Normaliza un angulo a [-PI, PI] para comparaciones estables de direccion.
+pub fn normalize_angle(mut angle: f32) -> f32 {
+    let two_pi = std::f32::consts::PI * 2.0;
+
+    while angle > std::f32::consts::PI {
+        angle -= two_pi;
+    }
+    while angle < -std::f32::consts::PI {
+        angle += two_pi;
+    }
+
+    angle
+}
