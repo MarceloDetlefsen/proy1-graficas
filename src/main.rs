@@ -1,6 +1,7 @@
 mod framebuffer;
 mod colors;
 mod game_state;
+mod hoop;
 mod input;
 mod level_data;
 mod map;
@@ -12,8 +13,9 @@ mod textures;
 use framebuffer::Framebuffer;
 use colors::{NBA_CREAM, NBA_NAVY, NBA_ORANGE};
 use game_state::GameState;
+use hoop::{Hoop, HoopState, SCORE_ANIM_DURATION};
 use level_data::{build_level, Level};
-use input::handle_input;
+use input::{handle_input, try_shoot};
 use player::Player;
 use raylib::prelude::*;
 use textures::TextureManager;
@@ -65,6 +67,10 @@ fn main() {
                 level,
                 current_level_index,
                 hoops_scored,
+                hoops,
+                feedback_message,
+                feedback_timer,
+                level_complete_timer,
             } => update_playing(
                     &mut window,
                     &mut framebuffer,
@@ -77,6 +83,10 @@ fn main() {
                     level,
                     *current_level_index,
                     hoops_scored,
+                    hoops,
+                    feedback_message,
+                    feedback_timer,
+                    level_complete_timer,
                     &mut player,
                 ),
             GameState::LevelSuccess { current_level_index } => update_level_success(
@@ -179,10 +189,15 @@ fn update_welcome(
     if window.is_key_pressed(KeyboardKey::KEY_ENTER) {
         let level = build_level(*selected_level);
         *player = spawn_player(&level);
+        let hoops = build_hoops(&level);
         return Some(GameState::Playing {
             level,
             current_level_index: *selected_level,
             hoops_scored: 0,
+            hoops,
+            feedback_message: None,
+            feedback_timer: 0.0,
+            level_complete_timer: 0.0,
         });
     }
 
@@ -201,20 +216,44 @@ fn update_playing(
     level: &Level,
     current_level_index: u32,
     hoops_scored: &mut usize,
+    hoops: &mut Vec<Hoop>,
+    feedback_message: &mut Option<String>,
+    feedback_timer: &mut f32,
+    level_complete_timer: &mut f32,
     player: &mut Player,
 ) -> Option<GameState> {
     handle_input(window, player, &level.grid, delta_time);
 
-    if window.is_key_pressed(KeyboardKey::KEY_K) {
-        *hoops_scored += 1;
-        // TODO: reemplazar con detección real de encestada.
+    *feedback_timer = (*feedback_timer - delta_time).max(0.0);
+    if *feedback_timer == 0.0 {
+        *feedback_message = None;
+    }
+
+    for hoop in hoops.iter_mut() {
+        hoop.score_anim_timer = (hoop.score_anim_timer - delta_time).max(0.0);
+    }
+
+    *level_complete_timer = (*level_complete_timer - delta_time).max(0.0);
+
+    if window.is_key_pressed(KeyboardKey::KEY_SPACE) {
+        if let Some((acerto, mensaje)) = try_shoot(player, hoops) {
+            *feedback_message = Some(mensaje);
+            *feedback_timer = 1.2;
+
+            if acerto {
+                *hoops_scored = hoops.iter().filter(|hoop| hoop.state == HoopState::Scored).count();
+                if *hoops_scored >= level.hoops_required {
+                    *level_complete_timer = SCORE_ANIM_DURATION;
+                }
+            }
+        }
     }
 
     renderer::render(
         framebuffer,
         player,
         &level.grid,
-        &level.hoop_positions,
+        hoops,
         texture_manager,
         screen_width,
         screen_height,
@@ -230,9 +269,12 @@ fn update_playing(
             *hoops_scored,
             level.hoops_required,
         );
+
+        draw_feedback_message(draw, screen_width, screen_height, feedback_message.as_deref());
+        draw_basketball_overlay(draw, screen_width, screen_height);
     });
 
-    if *hoops_scored >= level.hoops_required {
+    if *hoops_scored >= level.hoops_required && *level_complete_timer <= 0.0 {
         Some(GameState::LevelSuccess {
             current_level_index,
         })
@@ -275,10 +317,15 @@ fn update_level_success(
         if current_level_index < 3 {
             let next_level = build_level(current_level_index + 1);
             *player = spawn_player(&next_level);
+            let hoops = build_hoops(&next_level);
             return Some(GameState::Playing {
                 level: next_level,
                 current_level_index: current_level_index + 1,
                 hoops_scored: 0,
+                hoops,
+                feedback_message: None,
+                feedback_timer: 0.0,
+                level_complete_timer: 0.0,
             });
         }
 
@@ -330,6 +377,14 @@ fn spawn_player(level: &Level) -> Player {
     )
 }
 
+fn build_hoops(level: &Level) -> Vec<Hoop> {
+    level
+        .hoop_positions
+        .iter()
+        .map(|(x, y)| Hoop::new(*x, *y))
+        .collect()
+}
+
 fn draw_centered_text(
     draw: &mut RaylibDrawHandle<'_>,
     text: &str,
@@ -364,4 +419,37 @@ fn draw_basketball_icon(draw: &mut RaylibDrawHandle<'_>, x: i32, y: i32, radius:
         y - radius / 2,
         seam_color,
     );
+}
+
+fn draw_feedback_message(
+    draw: &mut RaylibDrawHandle<'_>,
+    screen_width: u32,
+    screen_height: u32,
+    message: Option<&str>,
+) {
+    let Some(message) = message else {
+        return;
+    };
+
+    let font_size = 24;
+    let color = if message.contains("ENCESTASTE") {
+        NBA_ORANGE
+    } else {
+        NBA_CREAM
+    };
+    let text_width = draw.measure_text(message, font_size);
+    let x = (screen_width as i32 - text_width) / 2;
+    let y = screen_height as i32 - 78;
+    draw.draw_text(message, x, y, font_size, color);
+}
+
+fn draw_basketball_overlay(draw: &mut RaylibDrawHandle<'_>, screen_width: u32, screen_height: u32) {
+    let x = (screen_width / 2) as i32;
+    let y = screen_height as i32 - 40;
+    let radius = 18;
+    draw.draw_circle(x, y, radius as f32, NBA_ORANGE);
+    draw.draw_circle_lines(x, y, radius as f32, Color::new(60, 30, 10, 255));
+    draw.draw_line(x - radius + 4, y, x + radius - 4, y, Color::new(40, 20, 8, 255));
+    draw.draw_line(x, y - radius + 4, x, y + radius - 4, Color::new(40, 20, 8, 255));
+    draw.draw_line(x - radius + 5, y - 5, x + radius - 5, y + 4, Color::new(40, 20, 8, 255));
 }
