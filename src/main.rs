@@ -20,6 +20,9 @@ use player::Player;
 use raylib::prelude::*;
 use textures::TextureManager;
 
+const RENDER_WIDTH: u32 = 800;
+const RENDER_HEIGHT: u32 = 600;
+
 fn main() {
     let (mut window, raylib_thread) = raylib::init()
         .size(800, 600)
@@ -29,9 +32,13 @@ fn main() {
 
     window.set_target_fps(60);
 
-    let mut screen_width = window.get_screen_width().max(1) as u32;
-    let mut screen_height = window.get_screen_height().max(1) as u32;
-    let mut framebuffer = Framebuffer::new(screen_width, screen_height, Color::BLACK);
+    let mut framebuffer = Framebuffer::new(
+        &mut window,
+        &raylib_thread,
+        RENDER_WIDTH,
+        RENDER_HEIGHT,
+        Color::BLACK,
+    );
     let texture_manager = TextureManager::new();
 
     let mut game_state = GameState::Welcome { selected_level: 1 };
@@ -39,11 +46,8 @@ fn main() {
     let mut show_minimap = false;
 
     while !window.window_should_close() {
-        screen_width = window.get_screen_width().max(1) as u32;
-        screen_height = window.get_screen_height().max(1) as u32;
-        if framebuffer.width() != screen_width as i32 || framebuffer.height() != screen_height as i32 {
-            framebuffer = Framebuffer::new(screen_width, screen_height, Color::BLACK);
-        }
+        let screen_width = window.get_screen_width().max(1) as u32;
+        let screen_height = window.get_screen_height().max(1) as u32;
 
         let delta_time = window.get_frame_time();
 
@@ -76,8 +80,8 @@ fn main() {
                     &mut framebuffer,
                     &raylib_thread,
                     &texture_manager,
-                    screen_width,
-                    screen_height,
+                    RENDER_WIDTH,
+                    RENDER_HEIGHT,
                     delta_time,
                     show_minimap,
                     level,

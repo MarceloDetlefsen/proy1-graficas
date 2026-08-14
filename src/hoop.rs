@@ -12,7 +12,7 @@ pub struct Hoop {
     pub score_anim_timer: f32,
 }
 
-pub const SCORE_ANIM_DURATION: f32 = 0.9;
+pub const SCORE_ANIM_DURATION: f32 = 0.6;
 
 impl Hoop {
     pub fn new(x: f32, y: f32) -> Self {

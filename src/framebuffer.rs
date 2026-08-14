@@ -1,18 +1,30 @@
 use raylib::prelude::*;
 use raylib::texture::Image;
+use raylib::core::texture::RaylibTexture2D;
 
-/// El mismo framebuffer usado en los laboratorios de polygon-fill / Game of Life, extendido con helpers para rectangulos y pixeles individuales.
+/// Framebuffer CPU con una textura GPU persistente para evitar recrear uploads por frame.
 pub struct Framebuffer {
     color_buffer: Image,
+    texture: Texture2D,
     current_color: Color,
 }
 
 impl Framebuffer {
-    pub fn new(width: u32, height: u32, background_color: Color) -> Self {
+    pub fn new(
+        window: &mut RaylibHandle,
+        raylib_thread: &RaylibThread,
+        width: u32,
+        height: u32,
+        background_color: Color,
+    ) -> Self {
         let color_buffer = Image::gen_image_color(width as i32, height as i32, background_color);
+        let texture = window
+            .load_texture_from_image(raylib_thread, &color_buffer)
+            .expect("failed to create framebuffer texture");
 
         Self {
             color_buffer,
+            texture,
             current_color: background_color,
         }
     }
@@ -42,45 +54,36 @@ impl Framebuffer {
             .draw_line(start_x, start_y, end_x, end_y, color);
     }
 
-    pub fn width(&self) -> i32 {
-        self.color_buffer.width()
-    }
-
-    pub fn height(&self) -> i32 {
-        self.color_buffer.height()
-    }
-
     pub fn clear(&mut self, color: Color) {
         self.color_buffer
             .draw_rectangle(0, 0, self.color_buffer.width(), self.color_buffer.height(), color);
     }
 
-    pub fn swap_buffers<F>(&self, window: &mut RaylibHandle, raylib_thread: &RaylibThread, overlay: F)
+    pub fn swap_buffers<F>(&mut self, window: &mut RaylibHandle, raylib_thread: &RaylibThread, overlay: F)
     where
         F: FnOnce(&mut RaylibDrawHandle<'_>),
     {
-        let texture = window.load_texture_from_image(raylib_thread, &self.color_buffer).ok();
+        let pixels = self.color_buffer.get_image_data_u8(false);
+        let _ = self.texture.update_texture(&pixels);
 
         window.draw(raylib_thread, |mut renderer| {
-            if let Some(texture) = texture.as_ref() {
-                let screen_width = renderer.get_screen_width() as f32;
-                let screen_height = renderer.get_screen_height() as f32;
-                let source = Rectangle::new(
-                    0.0,
-                    0.0,
-                    self.color_buffer.width() as f32,
-                    self.color_buffer.height() as f32,
-                );
-                let destination = Rectangle::new(0.0, 0.0, screen_width, screen_height);
-                renderer.draw_texture_pro(
-                    texture,
-                    source,
-                    destination,
-                    Vector2::new(0.0, 0.0),
-                    0.0,
-                    Color::WHITE,
-                );
-            }
+            let screen_width = renderer.get_screen_width() as f32;
+            let screen_height = renderer.get_screen_height() as f32;
+            let source = Rectangle::new(
+                0.0,
+                0.0,
+                self.color_buffer.width() as f32,
+                self.color_buffer.height() as f32,
+            );
+            let destination = Rectangle::new(0.0, 0.0, screen_width, screen_height);
+            renderer.draw_texture_pro(
+                &self.texture,
+                source,
+                destination,
+                Vector2::new(0.0, 0.0),
+                0.0,
+                Color::WHITE,
+            );
 
             overlay(&mut renderer);
         });
