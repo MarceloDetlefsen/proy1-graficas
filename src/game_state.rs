@@ -11,6 +11,7 @@ pub enum GameState {
         hoops: Vec<Hoop>,
         feedback_message: Option<String>,
         feedback_timer: f32,
+        level_complete_timer: f32,
     },
     LevelSuccess { current_level_index: u32 },
     Victory,
