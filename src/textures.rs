@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 pub struct TextureManager {
     wall_textures: Vec<Image>,
+    wall_textures_gpu: Vec<Texture2D>,
     floor_texture: Image,
     hoop_idle: Image,
     hoop_score_frames: Vec<Image>,
@@ -13,6 +14,7 @@ pub struct TextureManager {
 impl TextureManager {
     pub fn new(window: &mut RaylibHandle, raylib_thread: &RaylibThread) -> Self {
         let wall_textures = load_wall_textures("assets/walls");
+        let wall_textures_gpu = load_wall_textures_gpu(window, raylib_thread, &wall_textures);
         let floor_texture = load_floor_texture("assets/floor/wood.jpg");
         let hoop_idle = load_hoop_idle("assets/sprites/hoop_idle.png");
         let hoop_score_frames = load_hoop_score_frames("assets/sprites");
@@ -20,6 +22,7 @@ impl TextureManager {
 
         Self {
             wall_textures,
+            wall_textures_gpu,
             floor_texture,
             hoop_idle,
             hoop_score_frames,
@@ -29,6 +32,10 @@ impl TextureManager {
 
     pub fn wall_count(&self) -> usize {
         self.wall_textures.len()
+    }
+
+    pub fn wall_texture_gpu(&self, index: usize) -> Option<&Texture2D> {
+        self.wall_textures_gpu.get(index)
     }
 
     pub fn wall_pixel_color_bilinear(&self, index: usize, u: f32, v: f32) -> Color {
@@ -92,6 +99,27 @@ fn load_floor_texture(path: &str) -> Image {
         Ok(image) => image,
         Err(_) => generate_floor_fallback(),
     }
+}
+
+fn load_wall_textures_gpu(
+    window: &mut RaylibHandle,
+    raylib_thread: &RaylibThread,
+    wall_textures: &[Image],
+) -> Vec<Texture2D> {
+    let mut textures = Vec::with_capacity(wall_textures.len());
+
+    for image in wall_textures {
+        let texture = window.load_texture_from_image(raylib_thread, image).unwrap_or_else(|_| {
+            let fallback = Image::gen_image_color(64, 64, Color::MAGENTA);
+            window
+                .load_texture_from_image(raylib_thread, &fallback)
+                .expect("failed to create fallback wall texture")
+        });
+
+        textures.push(texture);
+    }
+
+    textures
 }
 
 fn load_hoop_idle(path: &str) -> Image {

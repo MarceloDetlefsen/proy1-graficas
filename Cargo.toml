@@ -9,3 +9,4 @@ debug = false
 
 [dependencies]
 raylib = { version = "6.0.0", features = ["SUPPORT_IMAGE_GENERATION", "SUPPORT_FILEFORMAT_PNG", "SUPPORT_FILEFORMAT_JPG"] }
+rand = "0.8"
