@@ -1,4 +1,4 @@
-/// Manejo de input: W/S para avanzar y retroceder, A/D para rotar.
+/// Manejo de input: W/S o arriba/abajo para moverse, A/D o izquierda/derecha para rotar.
 
 use raylib::prelude::*;
 
@@ -21,18 +21,26 @@ pub fn handle_input(
     delta_time: f32,
     mouse_delta_x: f32,
 ) {
-    if window.is_key_down(KeyboardKey::KEY_A) {
+    if window.is_key_down(KeyboardKey::KEY_A)
+        || window.is_key_down(KeyboardKey::KEY_LEFT)
+    {
         player.rotate(-player.rot_speed * delta_time);
     }
-    if window.is_key_down(KeyboardKey::KEY_D) {
+    if window.is_key_down(KeyboardKey::KEY_D)
+        || window.is_key_down(KeyboardKey::KEY_RIGHT)
+    {
         player.rotate(player.rot_speed * delta_time);
     }
 
     let mut move_dir: f32 = 0.0;
-    if window.is_key_down(KeyboardKey::KEY_W) {
+    if window.is_key_down(KeyboardKey::KEY_W)
+        || window.is_key_down(KeyboardKey::KEY_UP)
+    {
         move_dir += 1.0;
     }
-    if window.is_key_down(KeyboardKey::KEY_S) {
+    if window.is_key_down(KeyboardKey::KEY_S)
+        || window.is_key_down(KeyboardKey::KEY_DOWN)
+    {
         move_dir -= 1.0;
     }
 
