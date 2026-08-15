@@ -11,7 +11,16 @@ pub const SHOOT_ANGLE_THRESHOLD: f32 = 0.26;
 pub const IDEAL_DISTANCE_MIN: f32 = 1.8;
 pub const IDEAL_DISTANCE_MAX: f32 = 3.2;
 
-pub fn handle_input(window: &RaylibHandle, player: &mut Player, map: &MapGrid, delta_time: f32) {
+// Sensibilidad del giro horizontal en radianes por pixel de movimiento.
+const MOUSE_SENSITIVITY: f32 = 0.003;
+
+pub fn handle_input(
+    window: &RaylibHandle,
+    player: &mut Player,
+    map: &MapGrid,
+    delta_time: f32,
+    mouse_delta_x: f32,
+) {
     if window.is_key_down(KeyboardKey::KEY_A) {
         player.rotate(-player.rot_speed * delta_time);
     }
@@ -32,6 +41,10 @@ pub fn handle_input(window: &RaylibHandle, player: &mut Player, map: &MapGrid, d
         let dx = player.angle.cos() * step;
         let dy = player.angle.sin() * step;
         player.try_move(dx, dy, map);
+    }
+
+    if mouse_delta_x != 0.0 {
+        player.rotate(mouse_delta_x * MOUSE_SENSITIVITY);
     }
 }
 

@@ -58,6 +58,28 @@ fn main() {
 
         let delta_time = window.get_frame_time();
 
+        // Mouse-look: en Linux/Wayland, get_mouse_delta() de GLFW no es
+        // confiable (el pointer-lock del compositor compite con el warp
+        // interno de GLFW y el delta llega en 0 mientras hay teclas
+        // presionadas), asi que ahi calculamos el delta a mano recentrando
+        // el cursor cada frame. En Windows/Mac, disable_cursor() ya maneja
+        // el recentrado internamente y get_mouse_delta() funciona bien solo.
+        let mouse_delta_x = if matches!(game_state, GameState::Playing { .. }) {
+            if cfg!(target_os = "linux") {
+                let center = Vector2::new(screen_width as f32 / 2.0, screen_height as f32 / 2.0);
+                let mouse_pos = window.get_mouse_position();
+                let dx = mouse_pos.x - center.x;
+                window.set_mouse_position(center);
+                dx
+            } else {
+                window.get_mouse_delta().x
+            }
+        } else {
+            0.0
+        };
+
+        let was_playing = matches!(game_state, GameState::Playing { .. });
+
         if window.is_key_pressed(KeyboardKey::KEY_M) {
             show_minimap = !show_minimap;
         }
@@ -96,6 +118,7 @@ fn main() {
                     RENDER_WIDTH,
                     RENDER_HEIGHT,
                     delta_time,
+                    mouse_delta_x,
                     show_minimap,
                     level,
                     *current_level_index,
@@ -138,6 +161,19 @@ fn main() {
         };
 
         if let Some(state) = next_state {
+            let is_playing = matches!(&state, GameState::Playing { .. });
+            if !was_playing && is_playing {
+                window.disable_cursor();
+                // Solo en Linux necesitamos forzar el recentrado inicial a mano;
+                // en Windows/Mac disable_cursor() ya deja el cursor centrado.
+                if cfg!(target_os = "linux") {
+                    let center = Vector2::new(screen_width as f32 / 2.0, screen_height as f32 / 2.0);
+                    window.set_mouse_position(center);
+                }
+            } else if was_playing && !is_playing {
+                window.enable_cursor();
+            }
+
             game_state = state;
         }
     }
@@ -249,6 +285,7 @@ fn update_playing(
     screen_width: u32,
     screen_height: u32,
     delta_time: f32,
+    mouse_delta_x: f32,
     show_minimap: bool,
     level: &Level,
     current_level_index: u32,
@@ -259,7 +296,7 @@ fn update_playing(
     level_complete_timer: &mut f32,
     player: &mut Player,
 ) -> Option<GameState> {
-    handle_input(window, player, &level.grid, delta_time);
+    handle_input(window, player, &level.grid, delta_time, mouse_delta_x);
 
     *feedback_timer = (*feedback_timer - delta_time).max(0.0);
     if *feedback_timer == 0.0 {
@@ -272,7 +309,9 @@ fn update_playing(
 
     *level_complete_timer = (*level_complete_timer - delta_time).max(0.0);
 
-    if window.is_key_pressed(KeyboardKey::KEY_SPACE) {
+    if window.is_key_pressed(KeyboardKey::KEY_SPACE)
+        || window.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT)
+    {
         if let Some((acerto, mensaje)) = try_shoot(player, hoops) {
             *feedback_message = Some(mensaje);
             *feedback_timer = 1.2;
