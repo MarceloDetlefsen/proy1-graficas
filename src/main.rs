@@ -1,4 +1,5 @@
 mod background;
+mod audio;
 mod framebuffer;
 mod colors;
 mod game_state;
@@ -14,6 +15,7 @@ mod textures;
 use framebuffer::Framebuffer;
 use colors::{NBA_CREAM, NBA_NAVY, NBA_ORANGE};
 use background::draw_screen_background;
+use audio::MusicManager;
 use game_state::{ConfettiPiece, GameState};
 use hoop::{Hoop, HoopState, SCORE_ANIM_DURATION};
 use level_data::{build_level, Level};
@@ -44,6 +46,8 @@ fn main() {
         RENDER_HEIGHT,
         Color::BLACK,
     );
+    let audio = RaylibAudio::init_audio_device().expect("no se pudo inicializar el audio");
+    let mut music_manager = MusicManager::new(&audio);
     let texture_manager = TextureManager::new(&mut window, &raylib_thread);
 
     let mut game_state = GameState::Welcome {
@@ -177,10 +181,14 @@ fn main() {
                 }
             } else if was_playing && !is_playing {
                 window.enable_cursor();
+                music_manager.stop_all();
             }
 
             game_state = state;
         }
+
+        music_manager.sync_state(&audio, &game_state);
+        music_manager.update();
     }
 }
 
