@@ -9,6 +9,7 @@ pub struct TextureManager {
     hoop_idle: Image,
     hoop_score_frames: Vec<Image>,
     basketball: Texture2D,
+    trophy_image: Option<Image>,
 }
 
 impl TextureManager {
@@ -19,6 +20,7 @@ impl TextureManager {
         let hoop_idle = load_hoop_idle("assets/sprites/hoop_idle.png");
         let hoop_score_frames = load_hoop_score_frames("assets/sprites");
         let basketball = load_basketball_texture(window, raylib_thread, "assets/ball/basketball.png");
+        let trophy_image = load_optional_image("assets/ui/trophy.png");
 
         Self {
             wall_textures,
@@ -27,6 +29,7 @@ impl TextureManager {
             hoop_idle,
             hoop_score_frames,
             basketball,
+            trophy_image,
         }
     }
 
@@ -71,6 +74,20 @@ impl TextureManager {
     pub fn basketball_texture(&self) -> &Texture2D {
         &self.basketball
     }
+
+    pub fn has_trophy_image(&self) -> bool {
+        self.trophy_image.is_some()
+    }
+
+    pub fn trophy_dimensions(&self) -> Option<(i32, i32)> {
+        self.trophy_image
+            .as_ref()
+            .map(|image| (image.width().max(1), image.height().max(1)))
+    }
+
+    pub fn trophy_image(&self) -> Option<&Image> {
+        self.trophy_image.as_ref()
+    }
 }
 
 fn load_wall_textures(dir: &str) -> Vec<Image> {
@@ -99,6 +116,14 @@ fn load_floor_texture(path: &str) -> Image {
         Ok(image) => image,
         Err(_) => generate_floor_fallback(),
     }
+}
+
+fn load_optional_image(path: &str) -> Option<Image> {
+    if !Path::new(path).exists() {
+        return None;
+    }
+
+    Image::load_image(path).ok()
 }
 
 fn load_wall_textures_gpu(

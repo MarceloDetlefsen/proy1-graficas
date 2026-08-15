@@ -21,6 +21,7 @@ use input::{handle_input, try_shoot};
 use player::Player;
 use raylib::prelude::*;
 use rand::Rng;
+use std::f32::consts::PI;
 use textures::TextureManager;
 
 const RENDER_WIDTH: u32 = 800;
@@ -180,6 +181,7 @@ fn update_welcome(
             start_x + icon_radius,
             title_y + icon_radius + 2,
             icon_radius,
+            Color::new(25, 20, 15, 255),
             *elapsed_time * 1.35,
         );
         draw_shadowed_text(
@@ -356,7 +358,7 @@ fn update_level_success(
         let mut ball_x = (screen_width as i32 - total_width) / 2 + ball_radius;
         let ball_y = (screen_height as i32 * 42) / 100;
         for _ in 0..hoops_required {
-            draw_ball_marker(draw, ball_x, ball_y, ball_radius, NBA_ORANGE);
+            draw_ball_marker(draw, ball_x, ball_y, ball_radius);
             ball_x += ball_radius * 2 + ball_gap;
         }
 
@@ -409,6 +411,14 @@ fn update_victory(
 ) -> Option<GameState> {
     *elapsed_time += delta_time;
     update_confetti(confetti.as_mut_slice(), screen_width, screen_height, delta_time);
+    let trophy_texture = if texture_manager.has_trophy_image() {
+        texture_manager
+            .trophy_image()
+            .and_then(|image| window.load_texture_from_image(raylib_thread, image).ok())
+    } else {
+        None
+    };
+    let trophy_dimensions = texture_manager.trophy_dimensions();
 
     framebuffer.clear(NBA_NAVY);
     framebuffer.swap_buffers(window, raylib_thread, |draw| {
@@ -418,7 +428,11 @@ fn update_victory(
             draw_confetti_piece(draw, piece);
         }
 
-        draw_trophy(draw, screen_width, screen_height);
+        if let (Some(trophy), Some(dimensions)) = (trophy_texture.as_ref(), trophy_dimensions) {
+            draw_trophy_image(draw, screen_width, screen_height, trophy, dimensions);
+        } else {
+            draw_trophy(draw, screen_width, screen_height);
+        }
 
         draw_shadowed_centered_text(
             draw,
@@ -510,45 +524,62 @@ fn draw_basketball_icon(
     x: i32,
     y: i32,
     radius: i32,
+    line_color: Color,
     rotation: f32,
 ) {
     draw.draw_circle(x, y, radius as f32, NBA_ORANGE);
-    draw.draw_circle_lines(x, y, radius as f32, Color::new(60, 30, 10, 255));
+    draw.draw_circle_lines(x, y, radius as f32, line_color);
 
-    let seam_color = Color::new(50, 25, 10, 255);
-    let seam_points = [
-        ((-radius + 3) as f32, 0.0_f32, (radius - 3) as f32, 0.0_f32),
-        (0.0_f32, (-radius + 3) as f32, 0.0_f32, (radius - 3) as f32),
-        (
-            (-radius + 5) as f32,
-            -(radius as f32) * 0.5,
-            (radius - 5) as f32,
-            (radius as f32) * 0.5,
-        ),
-        (
-            (-radius + 5) as f32,
-            (radius as f32) * 0.5,
-            (radius - 5) as f32,
-            -(radius as f32) * 0.5,
-        ),
-    ];
+    let seam_thickness = basketball_line_thickness(radius);
+    draw_rotated_line(
+        draw,
+        x,
+        y,
+        (-radius + 3) as f32,
+        0.0_f32,
+        (radius - 3) as f32,
+        0.0_f32,
+        rotation,
+        seam_thickness,
+        line_color,
+    );
+    draw_rotated_line(
+        draw,
+        x,
+        y,
+        0.0_f32,
+        (-radius + 3) as f32,
+        0.0_f32,
+        (radius - 3) as f32,
+        rotation,
+        seam_thickness,
+        line_color,
+    );
 
-    for (x0, y0, x1, y1) in seam_points {
-        let (rx0, ry0) = rotate_point(x0, y0, rotation);
-        let (rx1, ry1) = rotate_point(x1, y1, rotation);
-        draw.draw_line(
-            x + rx0.round() as i32,
-            y + ry0.round() as i32,
-            x + rx1.round() as i32,
-            y + ry1.round() as i32,
-            seam_color,
-        );
-    }
+    draw_rotated_curve(
+        draw,
+        x,
+        y,
+        radius,
+        rotation,
+        seam_thickness,
+        line_color,
+        true,
+    );
+    draw_rotated_curve(
+        draw,
+        x,
+        y,
+        radius,
+        rotation,
+        seam_thickness,
+        line_color,
+        false,
+    );
 }
 
-fn draw_ball_marker(draw: &mut RaylibDrawHandle<'_>, x: i32, y: i32, radius: i32, color: Color) {
-    draw.draw_circle(x, y, radius as f32, color);
-    draw.draw_circle_lines(x, y, radius as f32, Color::new(60, 30, 10, 200));
+fn draw_ball_marker(draw: &mut RaylibDrawHandle<'_>, x: i32, y: i32, radius: i32) {
+    draw_basketball_icon(draw, x, y, radius, Color::new(25, 20, 15, 210), 0.0);
 }
 
 fn draw_trophy(draw: &mut RaylibDrawHandle<'_>, screen_width: u32, screen_height: u32) {
@@ -567,6 +598,96 @@ fn draw_trophy(draw: &mut RaylibDrawHandle<'_>, screen_width: u32, screen_height
     );
     draw.draw_rectangle(center_x - 34, body_bottom_y + 2, 68, 16, NBA_CREAM);
     draw.draw_rectangle(center_x - 10, body_bottom_y + 18, 20, 14, Color::new(230, 200, 130, 255));
+}
+
+fn draw_trophy_image(
+    draw: &mut RaylibDrawHandle<'_>,
+    screen_width: u32,
+    screen_height: u32,
+    trophy: &Texture2D,
+    dimensions: (i32, i32),
+) {
+    // Se centra en la parte superior y se fija una altura legible.
+    let target_h = 152.0_f32;
+    let source_w = dimensions.0.max(1) as f32;
+    let source_h = dimensions.1.max(1) as f32;
+    let scale = target_h / source_h;
+    let target_w = source_w * scale;
+    let center_x = screen_width as f32 * 0.5;
+    let top_y = (screen_height as f32 * 0.14).min((screen_height as f32 * 0.5 - target_h).max(0.0));
+    let source = Rectangle::new(0.0, 0.0, source_w, source_h);
+    let dest = Rectangle::new(center_x - target_w * 0.5, top_y, target_w, target_h);
+
+    draw.draw_texture_pro(
+        trophy,
+        source,
+        dest,
+        Vector2::new(0.0, 0.0),
+        0.0,
+        Color::WHITE,
+    );
+}
+
+fn basketball_line_thickness(radius: i32) -> f32 {
+    if radius >= 16 {
+        3.0
+    } else if radius >= 9 {
+        2.0
+    } else {
+        1.0
+    }
+}
+
+fn draw_rotated_line(
+    draw: &mut RaylibDrawHandle<'_>,
+    center_x: i32,
+    center_y: i32,
+    x0: f32,
+    y0: f32,
+    x1: f32,
+    y1: f32,
+    rotation: f32,
+    thickness: f32,
+    color: Color,
+) {
+    let (rx0, ry0) = rotate_point(x0, y0, rotation);
+    let (rx1, ry1) = rotate_point(x1, y1, rotation);
+    draw.draw_line_ex(
+        Vector2::new(center_x as f32 + rx0, center_y as f32 + ry0),
+        Vector2::new(center_x as f32 + rx1, center_y as f32 + ry1),
+        thickness,
+        color,
+    );
+}
+
+fn draw_rotated_curve(
+    draw: &mut RaylibDrawHandle<'_>,
+    center_x: i32,
+    center_y: i32,
+    radius: i32,
+    rotation: f32,
+    thickness: f32,
+    color: Color,
+    left_side: bool,
+) {
+    let segments = 9;
+    let mut previous: Option<Vector2> = None;
+
+    // La curva se aproxima con tramos cortos para simular la costura lateral.
+    for step in 0..=segments {
+        let t = step as f32 / segments as f32;
+        let offset_x = radius as f32 * 0.55 * (t * PI).sin();
+        let local_x = if left_side { -offset_x } else { offset_x };
+        let local_y = -radius as f32 + t * 2.0 * radius as f32;
+        let (rx, ry) = rotate_point(local_x, local_y, rotation);
+        let current = Vector2::new(center_x as f32 + rx, center_y as f32 + ry);
+
+        if let Some(previous) = previous {
+            draw.draw_line_ex(previous, current, thickness, color);
+        }
+
+        previous = Some(current);
+    }
 }
 
 fn draw_confetti_piece(draw: &mut RaylibDrawHandle<'_>, piece: &ConfettiPiece) {
@@ -709,7 +830,7 @@ fn draw_level_card(
     let icon_y = y + 82;
 
     for _ in 0..hoops_required {
-        draw_ball_marker(draw, icon_x, icon_y, icon_radius, NBA_ORANGE);
+        draw_ball_marker(draw, icon_x, icon_y, icon_radius);
         icon_x += icon_radius * 2 + icon_gap;
     }
 }
