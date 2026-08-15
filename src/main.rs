@@ -26,6 +26,7 @@ use textures::TextureManager;
 
 const RENDER_WIDTH: u32 = 800;
 const RENDER_HEIGHT: u32 = 600;
+const THROW_ANIM_DURATION: f32 = 0.45;
 
 fn main() {
     let (mut window, raylib_thread) = raylib::init()
@@ -109,6 +110,8 @@ fn main() {
                 hoops,
                 feedback_message,
                 feedback_timer,
+                throw_anim_timer,
+                throw_anim_total,
                 level_complete_timer,
             } => update_playing(
                     &mut window,
@@ -126,6 +129,8 @@ fn main() {
                     hoops,
                     feedback_message,
                     feedback_timer,
+                    throw_anim_timer,
+                    throw_anim_total,
                     level_complete_timer,
                     &mut player,
                 ),
@@ -217,6 +222,7 @@ fn update_welcome(
             start_x + icon_radius,
             title_y + icon_radius + 2,
             icon_radius,
+            NBA_ORANGE,
             Color::new(25, 20, 15, 255),
             *elapsed_time * 1.35,
         );
@@ -270,6 +276,8 @@ fn update_welcome(
             hoops,
             feedback_message: None,
             feedback_timer: 0.0,
+            throw_anim_timer: 0.0,
+            throw_anim_total: 0.0,
             level_complete_timer: 0.0,
         });
     }
@@ -293,6 +301,8 @@ fn update_playing(
     hoops: &mut Vec<Hoop>,
     feedback_message: &mut Option<String>,
     feedback_timer: &mut f32,
+    throw_anim_timer: &mut f32,
+    throw_anim_total: &mut f32,
     level_complete_timer: &mut f32,
     player: &mut Player,
 ) -> Option<GameState> {
@@ -303,18 +313,26 @@ fn update_playing(
         *feedback_message = None;
     }
 
+    *throw_anim_timer = (*throw_anim_timer - delta_time).max(0.0);
+    if *throw_anim_timer == 0.0 {
+        *throw_anim_total = 0.0;
+    }
+
     for hoop in hoops.iter_mut() {
         hoop.score_anim_timer = (hoop.score_anim_timer - delta_time).max(0.0);
     }
 
     *level_complete_timer = (*level_complete_timer - delta_time).max(0.0);
 
-    if window.is_key_pressed(KeyboardKey::KEY_SPACE)
-        || window.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT)
+    if (*throw_anim_timer <= 0.0)
+        && (window.is_key_pressed(KeyboardKey::KEY_SPACE)
+            || window.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT))
     {
         if let Some((acerto, mensaje)) = try_shoot(player, hoops) {
             *feedback_message = Some(mensaje);
             *feedback_timer = 1.2;
+            *throw_anim_timer = THROW_ANIM_DURATION;
+            *throw_anim_total = THROW_ANIM_DURATION;
 
             if acerto {
                 *hoops_scored = hoops.iter().filter(|hoop| hoop.state == HoopState::Scored).count();
@@ -347,7 +365,14 @@ fn update_playing(
         );
 
         draw_feedback_message(draw, screen_width, screen_height, feedback_message.as_deref());
-        draw_basketball_overlay(draw, screen_width, screen_height, texture_manager.basketball_texture());
+        draw_hand_ball(
+            draw,
+            screen_width,
+            screen_height,
+            texture_manager.basketball_texture(),
+            *throw_anim_timer,
+            *throw_anim_total,
+        );
     });
 
     if *hoops_scored >= level.hoops_required && *level_complete_timer <= 0.0 {
@@ -424,6 +449,8 @@ fn update_level_success(
                 hoops,
                 feedback_message: None,
                 feedback_timer: 0.0,
+                throw_anim_timer: 0.0,
+                throw_anim_total: 0.0,
                 level_complete_timer: 0.0,
             });
         }
@@ -563,13 +590,14 @@ fn draw_basketball_icon(
     x: i32,
     y: i32,
     radius: i32,
+    fill_color: Color,
     line_color: Color,
     rotation: f32,
 ) {
-    draw.draw_circle(x, y, radius as f32, NBA_ORANGE);
+    draw.draw_circle(x, y, radius as f32, fill_color);
     draw.draw_circle_lines(x, y, radius as f32, line_color);
 
-    let seam_thickness = basketball_line_thickness(radius);
+    let seam_thickness = basketball_line_thickness(radius as f32);
     draw_rotated_line(
         draw,
         x,
@@ -618,7 +646,15 @@ fn draw_basketball_icon(
 }
 
 fn draw_ball_marker(draw: &mut RaylibDrawHandle<'_>, x: i32, y: i32, radius: i32) {
-    draw_basketball_icon(draw, x, y, radius, Color::new(25, 20, 15, 210), 0.0);
+    draw_basketball_icon(
+        draw,
+        x,
+        y,
+        radius,
+        NBA_ORANGE,
+        Color::new(25, 20, 15, 210),
+        0.0,
+    );
 }
 
 fn draw_trophy(draw: &mut RaylibDrawHandle<'_>, screen_width: u32, screen_height: u32) {
@@ -667,14 +703,8 @@ fn draw_trophy_image(
     );
 }
 
-fn basketball_line_thickness(radius: i32) -> f32 {
-    if radius >= 16 {
-        3.0
-    } else if radius >= 9 {
-        2.0
-    } else {
-        1.0
-    }
+fn basketball_line_thickness(radius: f32) -> f32 {
+    (radius * 0.16).clamp(1.0, 3.0)
 }
 
 fn draw_rotated_line(
@@ -896,20 +926,62 @@ fn draw_feedback_message(
     draw.draw_text(message, x, y, font_size, color);
 }
 
-fn draw_basketball_overlay(
+fn draw_hand_ball(
     draw: &mut RaylibDrawHandle<'_>,
     screen_width: u32,
     screen_height: u32,
     basketball: &Texture2D,
+    throw_anim_timer: f32,
+    throw_anim_total: f32,
 ) {
-    let dest_w = 48.0;
-    let dest_h = 48.0;
-    let x = screen_width as f32 / 2.0 - dest_w / 2.0;
-    let y = screen_height as f32 - dest_h - 12.0;
-    let tex_w = basketball.width().max(1) as f32;
-    let tex_h = basketball.height().max(1) as f32;
-    let source = Rectangle::new(0.0, 0.0, tex_w, tex_h);
-    let dest = Rectangle::new(x, y, dest_w, dest_h);
+    let progress = if throw_anim_total > 0.0 {
+        (1.0 - (throw_anim_timer / throw_anim_total)).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    let eased_t = 1.0 - (1.0 - progress).powi(2);
+    let arc_t = progress;
+
+    let rest_x = screen_width as f32 / 2.0;
+    let rest_y = screen_height as f32 - 50.0;
+    let rest_radius = 34.0;
+    let target_x = screen_width as f32 / 2.0;
+    let target_y = screen_height as f32 * 0.42;
+    let target_radius = 11.0;
+    let arc_height = 42.0;
+
+    let current_x = rest_x + (target_x - rest_x) * eased_t;
+    let current_y = rest_y
+        + (target_y - rest_y) * eased_t
+        - arc_height * 4.0 * arc_t * (1.0 - arc_t);
+    let current_radius = rest_radius + (target_radius - rest_radius) * eased_t;
+
+    let alpha = if throw_anim_timer > 0.0 {
+        let fade_start = 0.7;
+        if eased_t < fade_start {
+            255
+        } else {
+            let fade_t = (eased_t - fade_start) / (1.0 - fade_start);
+            (255.0 * (1.0 - fade_t)).clamp(0.0, 255.0) as u8
+        }
+    } else {
+        255
+    };
+
+    let dest_w = (current_radius * 2.4).max(1.0);
+    let dest_h = dest_w;
+    let source = Rectangle::new(
+        0.0,
+        0.0,
+        basketball.width().max(1) as f32,
+        basketball.height().max(1) as f32,
+    );
+    let dest = Rectangle::new(
+        current_x - dest_w * 0.5,
+        current_y - dest_h * 0.5,
+        dest_w,
+        dest_h,
+    );
 
     draw.draw_texture_pro(
         basketball,
@@ -917,6 +989,6 @@ fn draw_basketball_overlay(
         dest,
         Vector2::new(0.0, 0.0),
         0.0,
-        Color::WHITE,
+        Color::new(255, 255, 255, alpha),
     );
 }
