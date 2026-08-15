@@ -16,6 +16,10 @@ pub struct MusicManager<'a> {
     current_scene: Option<MusicScene>,
 }
 
+pub struct SoundManager<'a> {
+    swish: Option<Sound<'a>>,
+}
+
 impl<'a> MusicManager<'a> {
     pub fn new(audio: &'a RaylibAudio) -> Self {
         let title_track = load_track(audio, "assets/music/tittle_screen.ogg");
@@ -146,6 +150,20 @@ impl<'a> MusicManager<'a> {
     }
 }
 
+impl<'a> SoundManager<'a> {
+    pub fn new(audio: &'a RaylibAudio) -> Self {
+        let swish = load_sound(audio, "assets/sfx/swish.ogg");
+
+        Self { swish }
+    }
+
+    pub fn play_swish(&self, _audio: &RaylibAudio) {
+        if let Some(swish) = self.swish.as_ref() {
+            swish.play();
+        }
+    }
+}
+
 fn load_track<'a>(audio: &'a RaylibAudio, path: &str) -> Option<Music<'a>> {
     if !Path::new(path).exists() {
         eprintln!("No se encontró la canción: {path}");
@@ -159,6 +177,21 @@ fn load_track<'a>(audio: &'a RaylibAudio, path: &str) -> Option<Music<'a>> {
         }
         Err(error) => {
             eprintln!("No se pudo cargar la canción {path}: {error:?}");
+            None
+        }
+    }
+}
+
+fn load_sound<'a>(audio: &'a RaylibAudio, path: &str) -> Option<Sound<'a>> {
+    if !Path::new(path).exists() {
+        eprintln!("No se encontró el sonido: {path}");
+        return None;
+    }
+
+    match audio.new_sound(path) {
+        Ok(sound) => Some(sound),
+        Err(error) => {
+            eprintln!("No se pudo cargar el sonido {path}: {error:?}");
             None
         }
     }

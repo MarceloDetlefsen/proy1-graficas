@@ -15,7 +15,7 @@ mod textures;
 use framebuffer::Framebuffer;
 use colors::{NBA_CREAM, NBA_NAVY, NBA_ORANGE};
 use background::draw_screen_background;
-use audio::MusicManager;
+use audio::{MusicManager, SoundManager};
 use game_state::{ConfettiPiece, GameState};
 use hoop::{Hoop, HoopState, SCORE_ANIM_DURATION};
 use level_data::{build_level, Level};
@@ -48,6 +48,7 @@ fn main() {
     );
     let audio = RaylibAudio::init_audio_device().expect("no se pudo inicializar el audio");
     let mut music_manager = MusicManager::new(&audio);
+    let sound_manager = SoundManager::new(&audio);
     let texture_manager = TextureManager::new(&mut window, &raylib_thread);
 
     let mut game_state = GameState::Welcome {
@@ -119,12 +120,14 @@ fn main() {
                 level_complete_timer,
             } => update_playing(
                     &mut window,
-                    &mut framebuffer,
-                    &raylib_thread,
-                    &texture_manager,
-                    RENDER_WIDTH,
-                    RENDER_HEIGHT,
-                    delta_time,
+                &mut framebuffer,
+                &raylib_thread,
+                &texture_manager,
+                &sound_manager,
+                &audio,
+                RENDER_WIDTH,
+                RENDER_HEIGHT,
+                delta_time,
                     mouse_delta_x,
                     show_minimap,
                     level,
@@ -298,6 +301,8 @@ fn update_playing(
     framebuffer: &mut Framebuffer,
     raylib_thread: &RaylibThread,
     texture_manager: &TextureManager,
+    sound_manager: &SoundManager,
+    audio: &RaylibAudio,
     screen_width: u32,
     screen_height: u32,
     delta_time: f32,
@@ -343,6 +348,7 @@ fn update_playing(
             *throw_anim_total = THROW_ANIM_DURATION;
 
             if acerto {
+                sound_manager.play_swish(audio);
                 *hoops_scored = hoops.iter().filter(|hoop| hoop.state == HoopState::Scored).count();
                 if *hoops_scored >= level.hoops_required {
                     *level_complete_timer = SCORE_ANIM_DURATION;
