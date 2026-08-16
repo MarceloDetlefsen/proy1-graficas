@@ -9,7 +9,7 @@ dentro del rango de distancia correcto para pasar de nivel.
 ## Screenshots
 
 ### Gameplay
-![Gameplay](images/doom.gif)
+![Gameplay](images/nba_raycasting.gif)
 
 ### Pantalla de bienvenida
 ![Welcome](images/welcome.png)
